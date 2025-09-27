@@ -3,6 +3,7 @@
 
 # Variables
 API_DIR = src/packages/api
+FLUTTER_DIR = src/packages/flutter-app
 DOCKER_IMAGE = travel-route-planner-api
 DOCKER_TAG = latest
 
@@ -13,20 +14,32 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # Docker commands
-docker-build: ## Build the API Docker image
+docker-build: ## Build all Docker images
+	docker-compose build
+
+docker-build-api: ## Build only the API Docker image
 	docker-compose build travel-route-planner-api
 
-docker-run: ## Run the API using Docker Compose
+docker-build-web: ## Build only the Flutter web Docker image
+	docker-compose build travel-route-planner-web
+
+docker-run: ## Run all services using Docker Compose
 	docker-compose up
 
-docker-run-bg: ## Run the API in background using Docker Compose
+docker-run-bg: ## Run all services in background using Docker Compose
 	docker-compose up -d
 
 docker-stop: ## Stop Docker Compose services
 	docker-compose down
 
-docker-logs: ## Show Docker Compose logs
+docker-logs: ## Show Docker Compose logs for all services
+	docker-compose logs -f
+
+docker-logs-api: ## Show Docker Compose logs for API only
 	docker-compose logs -f travel-route-planner-api
+
+docker-logs-web: ## Show Docker Compose logs for web only
+	docker-compose logs -f travel-route-planner-web
 
 # API commands
 api-deps: ## Download API dependencies
@@ -47,6 +60,25 @@ api-fmt: ## Format Go code
 api-vet: ## Run go vet
 	cd $(API_DIR) && go vet ./...
 
+# Flutter commands
+flutter-deps: ## Install Flutter dependencies
+	cd $(FLUTTER_DIR) && flutter pub get
+
+flutter-build-web: ## Build Flutter web app
+	cd $(FLUTTER_DIR) && flutter build web
+
+flutter-build-models: ## Generate Flutter model code
+	cd $(FLUTTER_DIR) && dart run build_runner build
+
+flutter-run: ## Run Flutter app
+	cd $(FLUTTER_DIR) && flutter run
+
+flutter-test: ## Run Flutter tests
+	cd $(FLUTTER_DIR) && flutter test
+
+flutter-analyze: ## Analyze Flutter code
+	cd $(FLUTTER_DIR) && flutter analyze
+
 # Development commands
 dev: docker-run ## Start development environment (alias for docker-run)
 
@@ -63,11 +95,27 @@ clean: ## Clean up build artifacts
 setup: ## Initial project setup
 	@echo "Setting up Travel Route Planner development environment..."
 	cd $(API_DIR) && go mod tidy
-	@echo "Setup complete! Run 'make dev' to start development."
+	cd $(FLUTTER_DIR) && flutter pub get
+	@echo "Setup complete!"
+	@echo ""
+	@echo "🚀 Quick Start Options:"
+	@echo "  make docker-run     # Run both API and web app with Docker"
+	@echo "  make dev           # Run API only with Docker"
+	@echo "  make flutter-run   # Run Flutter app locally"
 
 # Health check
 health: ## Check API health
 	curl -s http://localhost:8081/api/v1/health | jq '.' || echo "API not running or jq not installed"
+
+health-web: ## Check web app health
+	curl -s http://localhost:3001/health || echo "Web app not running"
+
+health-all: ## Check health of all services
+	@echo "🔍 Checking API health..."
+	@curl -s http://localhost:8081/api/v1/health | jq '.' || echo "❌ API not running"
+	@echo ""
+	@echo "🔍 Checking web app health..."
+	@curl -s http://localhost:3001/health || echo "❌ Web app not running"
 
 # Quick test commands
 test-route: ## Test route optimization endpoint
@@ -81,10 +129,16 @@ test-countries: ## Test country optimization endpoint
 		-d '{"countries":[{"code":"US","name":"United States","latitude":39.8283,"longitude":-98.5795,"min_stay_days":7}],"optimize_for":"balanced"}' | jq '.'
 
 # Documentation
-docs: ## Open API documentation in browser
-	@echo "API Documentation:"
-	@echo "  Health Check: http://localhost:8081/api/v1/health"
+docs: ## Show application URLs and documentation
+	@echo "🌐 Application URLs:"
+	@echo "  Web App: http://localhost:3001"
+	@echo "  API Health: http://localhost:8081/api/v1/health"
+	@echo ""
+	@echo "📖 API Endpoints:"
 	@echo "  Route Optimization: POST http://localhost:8081/api/v1/optimize-route"
 	@echo "  Country Optimization: POST http://localhost:8081/api/v1/optimize-countries"
 	@echo ""
-	@echo "See README.md for detailed API documentation"
+	@echo "📚 Documentation:"
+	@echo "  Main README: ./README.md"
+	@echo "  API README: ./src/packages/api/README.md"
+	@echo "  Flutter README: ./src/packages/flutter-app/README.md"

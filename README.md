@@ -1,22 +1,33 @@
 # Travel Route Planner
 
-A comprehensive travel route planning platform with Go API backend and support for web and mobile frontends.
+A comprehensive travel route planning platform with Go API backend and beautiful Flutter mobile app frontend.
 
 ## Features
 
-- RESTful API endpoints
-- JSON responses
-- Logging middleware
-- CORS support
-- Health check endpoint
-- API versioning (v1)
-- Graceful server configuration
+### 🚀 **Go API Backend**
+- RESTful API endpoints with comprehensive route optimization
+- JSON request/response with detailed metrics and timing
+- CORS support and logging middleware
+- Health check and API versioning (v1)
+- Docker containerization for easy deployment
+
+### 📱 **Flutter Mobile App**
+- Beautiful Material Design 3 interface
+- Real-time route optimization with visual results
+- Location management with operating hours support
+- Country planning with seasonal intelligence
+- State management with Riverpod for smooth UX
+- Type-safe API integration with comprehensive error handling
 
 ## Prerequisites
 
-### Local Development
+### Go API Development
 - Go 1.21 or higher
 - Git (for cloning and dependency management)
+
+### Flutter App Development  
+- Flutter SDK (latest stable version)
+- iOS Simulator / Android Emulator or physical device
 
 ### Docker Development
 - Docker
@@ -27,16 +38,19 @@ A comprehensive travel route planning platform with Go API backend and support f
 ### Quick Start with Makefile (Recommended)
 
 ```bash
-# Setup the project (downloads dependencies)
+# Setup the entire project (API + Flutter dependencies)
 make setup
 
-# Start development environment with Docker
+# Option 1: Run both API and web app with Docker (Recommended)
+make docker-run
+
+# Option 2: Run just the API server with Docker
 make dev
 
-# Or run API locally
-make dev-api
+# Option 3: Run Flutter app locally (for development)
+make flutter-run
 
-# Run tests
+# Run API tests
 make test
 
 # See all available commands
@@ -47,15 +61,19 @@ make help
 
 #### Using Docker Compose (Easiest)
 ```bash
-# Build and start the application
+# Build and start both API and web app
 docker-compose up --build
 
 # Run in background
 docker-compose up -d --build
 
-# Stop the application
+# Stop all services
 docker-compose down
 ```
+
+The application will be available at:
+- **Web App**: http://localhost:3001
+- **API**: http://localhost:8081/api/v1
 
 #### Using Docker directly
 ```bash
@@ -532,7 +550,16 @@ travel-route-planner/
 │       │   ├── test_data.json      # Sample test data for location routing
 │       │   ├── test_countries.json # Sample test data for country routing
 │       │   └── test_examples.sh    # Automated test script
-│       └── flutter-app/            # Flutter mobile app (future)
+│       └── flutter-app/            # Flutter mobile app
+│           ├── lib/                # Flutter source code
+│           │   ├── main.dart       # App entry point
+│           │   ├── models/         # Data models (matching Go API)
+│           │   ├── services/       # API client
+│           │   ├── providers/      # Riverpod state management
+│           │   ├── screens/        # Main app screens
+│           │   └── widgets/        # Reusable UI components
+│           ├── test/               # Flutter tests
+│           └── pubspec.yaml        # Flutter dependencies
 ├── docker-compose.yml              # Docker Compose configuration
 ├── .dockerignore                   # Docker ignore patterns
 ├── .gitignore                      # Git ignore patterns
@@ -599,8 +626,17 @@ curl -X POST http://localhost:8081/api/v1/optimize-route \
 
 ## Docker Features
 
+### API Container
 - **Multi-stage build**: Optimized for small production images
 - **Security**: Non-root user execution
+- **Health checks**: Automated service monitoring
+- **Graceful shutdown**: Proper signal handling
+
+### Web App Container
+- **Multi-stage build**: Flutter compilation + nginx serving
+- **Production optimized**: Compiled Flutter web with optimized assets
+- **Nginx serving**: High-performance static file serving with proper headers
+- **PWA support**: Service worker and manifest for Progressive Web App features
 - **Health checks**: Built-in health monitoring
 - **Development ready**: Docker Compose with hot-reload capability
 - **Production ready**: Optimized Alpine Linux base image
