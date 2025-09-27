@@ -7,7 +7,16 @@
         "latitude": 40.7589,
         "longitude": -73.9851,
         "address": "1585 Broadway, New York, NY 10036",
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "06:00-22:00",
+          "tuesday": "06:00-22:00",
+          "wednesday": "06:00-22:00",
+          "thursday": "06:00-22:00",
+          "friday": "06:00-22:00",
+          "saturday": "06:30-22:00",
+          "sunday": "06:30-21:00"
+        }
       },
       {
         "id": "central_park",
@@ -15,7 +24,16 @@
         "latitude": 40.7829,
         "longitude": -73.9654,
         "address": "Central Park, New York, NY",
-        "category": "park"
+        "category": "park",
+        "hours": {
+          "monday": "06:00-01:00",
+          "tuesday": "06:00-01:00",
+          "wednesday": "06:00-01:00",
+          "thursday": "06:00-01:00",
+          "friday": "06:00-01:00",
+          "saturday": "06:00-01:00",
+          "sunday": "06:00-01:00"
+        }
       },
       {
         "id": "empire_state_building",
@@ -23,7 +41,16 @@
         "latitude": 40.7484,
         "longitude": -73.9857,
         "address": "350 5th Ave, New York, NY 10118",
-        "category": "tourist_attraction"
+        "category": "tourist_attraction",
+        "hours": {
+          "monday": "10:00-22:00",
+          "tuesday": "10:00-22:00",
+          "wednesday": "10:00-22:00",
+          "thursday": "10:00-22:00",
+          "friday": "10:00-22:00",
+          "saturday": "09:00-23:00",
+          "sunday": "09:00-22:00"
+        }
       },
       {
         "id": "brooklyn_bridge",
@@ -39,7 +66,16 @@
         "latitude": 40.6892,
         "longitude": -74.0445,
         "address": "Liberty Island, New York, NY 10004",
-        "category": "tourist_attraction"
+        "category": "tourist_attraction",
+        "hours": {
+          "monday": "09:30-17:00",
+          "tuesday": "09:30-17:00",
+          "wednesday": "09:30-17:00",
+          "thursday": "09:30-17:00",
+          "friday": "09:30-17:00",
+          "saturday": "09:30-17:00",
+          "sunday": "09:30-17:00"
+        }
       }
     ],
     "start_index": 0,
@@ -52,35 +88,80 @@
         "name": "Blue Bottle Coffee - Tribeca",
         "latitude": 40.7195,
         "longitude": -74.0089,
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "07:00-18:00",
+          "tuesday": "07:00-18:00",
+          "wednesday": "07:00-18:00",
+          "thursday": "07:00-18:00",
+          "friday": "07:00-18:00",
+          "saturday": "08:00-18:00",
+          "sunday": "08:00-17:00"
+        }
       },
       {
         "id": "intelligentsia_high_line",
         "name": "Intelligentsia Coffee - High Line",
         "latitude": 40.7420,
         "longitude": -74.0048,
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "06:30-19:00",
+          "tuesday": "06:30-19:00",
+          "wednesday": "06:30-19:00",
+          "thursday": "06:30-19:00",
+          "friday": "06:30-19:00",
+          "saturday": "07:00-19:00",
+          "sunday": "07:00-18:00"
+        }
       },
       {
         "id": "joe_coffee_waverly",
         "name": "Joe Coffee - Waverly Place",
         "latitude": 40.7323,
         "longitude": -74.0027,
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "06:00-20:00",
+          "tuesday": "06:00-20:00",
+          "wednesday": "06:00-20:00",
+          "thursday": "06:00-20:00",
+          "friday": "06:00-20:00",
+          "saturday": "07:00-20:00",
+          "sunday": "07:00-19:00"
+        }
       },
       {
         "id": "stumptown_ace_hotel",
         "name": "Stumptown Coffee - Ace Hotel",
         "latitude": 40.7451,
         "longitude": -73.9890,
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "06:00-19:00",
+          "tuesday": "06:00-19:00",
+          "wednesday": "06:00-19:00",
+          "thursday": "06:00-19:00",
+          "friday": "06:00-19:00",
+          "saturday": "07:00-19:00",
+          "sunday": "07:00-18:00"
+        }
       },
       {
         "id": "birch_coffee_flatiron",
         "name": "Birch Coffee - Flatiron",
         "latitude": 40.7414,
         "longitude": -73.9896,
-        "category": "coffee_shop"
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "07:00-18:00",
+          "tuesday": "07:00-18:00",
+          "wednesday": "07:00-18:00",
+          "thursday": "07:00-18:00",
+          "friday": "07:00-18:00",
+          "saturday": "08:00-17:00",
+          "sunday": "08:00-16:00"
+        }
       },
       {
         "id": "la_colombe_soho",

@@ -134,24 +134,39 @@ curl -X POST http://localhost:8081/api/v1/optimize-route \
         "name": "Starbucks Times Square",
         "latitude": 40.7589,
         "longitude": -73.9851,
-        "address": "1585 Broadway, New York, NY 10036"
-      },
-      {
-        "id": "central_park",
-        "name": "Central Park",
-        "latitude": 40.7829,
-        "longitude": -73.9654,
-        "address": "Central Park, New York, NY"
+        "address": "1585 Broadway, New York, NY 10036",
+        "category": "coffee_shop",
+        "hours": {
+          "monday": "06:00-22:00",
+          "tuesday": "06:00-22:00",
+          "wednesday": "06:00-22:00",
+          "thursday": "06:00-22:00",
+          "friday": "06:00-22:00",
+          "saturday": "06:30-22:00",
+          "sunday": "06:30-21:00"
+        }
       },
       {
         "id": "empire_state",
         "name": "Empire State Building",
         "latitude": 40.7484,
         "longitude": -73.9857,
-        "address": "350 5th Ave, New York, NY 10118"
+        "address": "350 5th Ave, New York, NY 10118",
+        "category": "tourist_attraction",
+        "hours": {
+          "monday": "10:00-22:00",
+          "tuesday": "10:00-22:00",
+          "wednesday": "10:00-22:00",
+          "thursday": "10:00-22:00",
+          "friday": "10:00-22:00",
+          "saturday": "09:00-23:00",
+          "sunday": "09:00-22:00"
+        }
       }
     ],
     "start_index": 0,
+    "start_time": "09:00",
+    "start_date": "2024-03-15",
     "return_to_start": true
   }'
 ```
@@ -195,7 +210,9 @@ Response:
         "longitude": -73.9851,
         "category": "coffee_shop"
       },
+      "arrival_time": "09:00",
       "visit_duration_minutes": 15,
+      "departure_time": "09:15",
       "travel_to_next_minutes": 2
     },
     {
@@ -204,20 +221,14 @@ Response:
         "name": "Empire State Building",
         "latitude": 40.7484,
         "longitude": -73.9857,
-        "category": "tourist_attraction"
+        "category": "tourist_attraction",
+        "hours": {
+          "monday": "10:00-22:00"
+        }
       },
+      "arrival_time": "10:00",
       "visit_duration_minutes": 45,
-      "travel_to_next_minutes": 4
-    },
-    {
-      "location": {
-        "id": "central_park",
-        "name": "Central Park",
-        "latitude": 40.7829,
-        "longitude": -73.9654,
-        "category": "park"
-      },
-      "visit_duration_minutes": 30,
+      "departure_time": "10:45",
       "travel_to_next_minutes": 0
     }
   ],
@@ -241,7 +252,17 @@ Response:
 | `locations[].address` | String | No | Optional address string |
 | `locations[].category` | String | No | Location category for visit time estimation |
 | `locations[].visit_duration_minutes` | Number | No | Override estimated visit time (minutes) |
+| `locations[].hours` | Object | No | Operating hours by day of week |
+| `locations[].hours.monday` | String | No | Monday hours (e.g., "09:00-17:00" or "closed") |
+| `locations[].hours.tuesday` | String | No | Tuesday hours |
+| `locations[].hours.wednesday` | String | No | Wednesday hours |
+| `locations[].hours.thursday` | String | No | Thursday hours |
+| `locations[].hours.friday` | String | No | Friday hours |
+| `locations[].hours.saturday` | String | No | Saturday hours |
+| `locations[].hours.sunday` | String | No | Sunday hours |
 | `start_index` | Number | No | Index of starting location (default: 0) |
+| `start_time` | String | No | Start time in "HH:MM" format (24-hour) |
+| `start_date` | String | No | Start date in "YYYY-MM-DD" format |
 | `return_to_start` | Boolean | No | Whether to return to starting point (default: false) |
 
 #### Supported Location Categories
@@ -267,6 +288,34 @@ Response:
 | `pharmacy` | 10 min | Prescription pickup |
 | `library` | 40 min | Reading/research |
 | `unknown` | 20 min | Default fallback |
+
+#### Operating Hours Format
+
+Operating hours should be specified in 24-hour format using the pattern `"HH:MM-HH:MM"` or `"closed"`:
+
+- **Standard hours**: `"09:00-17:00"` (9 AM to 5 PM)
+- **Late night**: `"18:00-02:00"` (6 PM to 2 AM next day)
+- **Closed**: `"closed"` or omit the day entirely
+- **24/7**: Omit the `hours` field entirely
+
+**Examples:**
+```json
+"hours": {
+  "monday": "09:00-17:00",
+  "tuesday": "09:00-17:00", 
+  "wednesday": "09:00-17:00",
+  "thursday": "09:00-17:00",
+  "friday": "09:00-17:00",
+  "saturday": "10:00-16:00",
+  "sunday": "closed"
+}
+```
+
+**Time-Aware Behavior:**
+- If you arrive before a location opens, the system waits until opening time
+- Routes automatically adjust to respect business hours
+- Closed days are handled by finding the next available day
+- Late-night hours (crossing midnight) are supported
 
 ## Building for Production
 
@@ -322,7 +371,10 @@ The application includes two middleware components:
 - **Quality**: Usually within 5-15% of optimal solution
 - **Flexibility**: Optional starting point and round-trip options
 - **Visit Time Estimation**: Category-based time estimates with custom overrides
-- **Detailed Timing**: Separates travel time from visit time for realistic planning
+- **Operating Hours Integration**: Validates location hours and adjusts arrival times
+- **Time-Aware Planning**: Automatically waits for closed locations to open
+- **Detailed Timing**: Real arrival/departure times with travel time separation
+- **Flexible Scheduling**: Supports custom start times and dates
 - **Comprehensive Metrics**: Distance, time estimates, and improvement statistics
 
 ## Testing

@@ -1,19 +1,34 @@
 package main
 
 import (
+	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 )
 
+// OperatingHours represents the operating hours for a location
+type OperatingHours struct {
+	Monday    string `json:"monday,omitempty"`    // e.g., "09:00-17:00" or "closed"
+	Tuesday   string `json:"tuesday,omitempty"`
+	Wednesday string `json:"wednesday,omitempty"`
+	Thursday  string `json:"thursday,omitempty"`
+	Friday    string `json:"friday,omitempty"`
+	Saturday  string `json:"saturday,omitempty"`
+	Sunday    string `json:"sunday,omitempty"`
+}
+
 // Location represents a geographic location
 type Location struct {
-	ID                 string  `json:"id"`
-	Name               string  `json:"name"`
-	Latitude           float64 `json:"latitude"`
-	Longitude          float64 `json:"longitude"`
-	Address            string  `json:"address,omitempty"`
-	Category           string  `json:"category,omitempty"`           // e.g., "coffee_shop", "museum", "restaurant"
-	VisitDurationMin   *int    `json:"visit_duration_minutes,omitempty"` // Optional override for visit time
+	ID                 string           `json:"id"`
+	Name               string           `json:"name"`
+	Latitude           float64          `json:"latitude"`
+	Longitude          float64          `json:"longitude"`
+	Address            string           `json:"address,omitempty"`
+	Category           string           `json:"category,omitempty"`           // e.g., "coffee_shop", "museum", "restaurant"
+	VisitDurationMin   *int             `json:"visit_duration_minutes,omitempty"` // Optional override for visit time
+	Hours              *OperatingHours  `json:"hours,omitempty"`             // Operating hours by day of week
 }
 
 // RouteRequest represents the input for route optimization
@@ -21,6 +36,8 @@ type RouteRequest struct {
 	Locations     []Location `json:"locations"`
 	StartIndex    *int       `json:"start_index,omitempty"` // Optional starting point (0-based)
 	ReturnToStart bool       `json:"return_to_start"`       // Round trip vs one-way
+	StartTime     *string    `json:"start_time,omitempty"`  // Start time in format "15:04" (24-hour) or RFC3339
+	StartDate     *string    `json:"start_date,omitempty"`  // Start date in format "2006-01-02" or full datetime
 }
 
 // LocationTiming represents timing information for a specific location
@@ -101,11 +118,156 @@ func (vte *VisitTimeEstimator) EstimateVisitTime(location Location) int {
 	return vte.defaultVisitTimes["unknown"]
 }
 
+// TimeHelper handles time calculations and operating hours validation
+type TimeHelper struct{}
+
+// parseTimeString parses time string in format "15:04" to hour and minute
+func (th *TimeHelper) parseTimeString(timeStr string) (int, int, error) {
+	parts := strings.Split(timeStr, ":")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid time format: %s", timeStr)
+	}
+	
+	hour, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid hour: %s", parts[0])
+	}
+	
+	minute, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("invalid minute: %s", parts[1])
+	}
+	
+	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
+		return 0, 0, fmt.Errorf("invalid time: %02d:%02d", hour, minute)
+	}
+	
+	return hour, minute, nil
+}
+
+// parseOperatingHours parses hours string like "09:00-17:00" or "closed"
+func (th *TimeHelper) parseOperatingHours(hoursStr string) (openHour, openMin, closeHour, closeMin int, isClosed bool, err error) {
+	if strings.ToLower(strings.TrimSpace(hoursStr)) == "closed" || hoursStr == "" {
+		return 0, 0, 0, 0, true, nil
+	}
+	
+	parts := strings.Split(hoursStr, "-")
+	if len(parts) != 2 {
+		return 0, 0, 0, 0, false, fmt.Errorf("invalid hours format: %s", hoursStr)
+	}
+	
+	openHour, openMin, err = th.parseTimeString(strings.TrimSpace(parts[0]))
+	if err != nil {
+		return 0, 0, 0, 0, false, fmt.Errorf("invalid open time: %v", err)
+	}
+	
+	closeHour, closeMin, err = th.parseTimeString(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, 0, 0, 0, false, fmt.Errorf("invalid close time: %v", err)
+	}
+	
+	return openHour, openMin, closeHour, closeMin, false, nil
+}
+
+// getHoursForDay returns the operating hours string for a given day of week
+func (th *TimeHelper) getHoursForDay(hours *OperatingHours, weekday time.Weekday) string {
+	if hours == nil {
+		return "" // Assume 24/7 if no hours specified
+	}
+	
+	switch weekday {
+	case time.Monday:
+		return hours.Monday
+	case time.Tuesday:
+		return hours.Tuesday
+	case time.Wednesday:
+		return hours.Wednesday
+	case time.Thursday:
+		return hours.Thursday
+	case time.Friday:
+		return hours.Friday
+	case time.Saturday:
+		return hours.Saturday
+	case time.Sunday:
+		return hours.Sunday
+	default:
+		return ""
+	}
+}
+
+// isLocationOpen checks if a location is open at a given time
+func (th *TimeHelper) isLocationOpen(location Location, checkTime time.Time) bool {
+	if location.Hours == nil {
+		return true // Assume always open if no hours specified
+	}
+	
+	hoursStr := th.getHoursForDay(location.Hours, checkTime.Weekday())
+	if hoursStr == "" {
+		return true // Assume open if no hours specified for this day
+	}
+	
+	openHour, openMin, closeHour, closeMin, isClosed, err := th.parseOperatingHours(hoursStr)
+	if err != nil || isClosed {
+		return false
+	}
+	
+	// Convert times to minutes since midnight for easier comparison
+	checkMinutes := checkTime.Hour()*60 + checkTime.Minute()
+	openMinutes := openHour*60 + openMin
+	closeMinutes := closeHour*60 + closeMin
+	
+	// Handle cases where closing time is past midnight (e.g., 09:00-02:00 for late-night venues)
+	if closeMinutes < openMinutes {
+		// Location is open past midnight
+		return checkMinutes >= openMinutes || checkMinutes <= closeMinutes
+	}
+	
+	// Normal case: same-day hours
+	return checkMinutes >= openMinutes && checkMinutes <= closeMinutes
+}
+
+// getNextOpenTime finds the next time a location will be open
+func (th *TimeHelper) getNextOpenTime(location Location, fromTime time.Time) time.Time {
+	if location.Hours == nil {
+		return fromTime // Always open
+	}
+	
+	// Check up to 7 days ahead
+	checkTime := fromTime
+	for i := 0; i < 7; i++ {
+		hoursStr := th.getHoursForDay(location.Hours, checkTime.Weekday())
+		if hoursStr != "" {
+			openHour, openMin, _, _, isClosed, err := th.parseOperatingHours(hoursStr)
+			if err == nil && !isClosed {
+				// Create opening time for this day
+				openTime := time.Date(checkTime.Year(), checkTime.Month(), checkTime.Day(), 
+					openHour, openMin, 0, 0, checkTime.Location())
+				
+				// If this is today and the open time hasn't passed yet, return it
+				if i == 0 && openTime.After(fromTime) {
+					return openTime
+				}
+				// If this is a future day, return the opening time
+				if i > 0 {
+					return openTime
+				}
+			}
+		}
+		// Move to next day
+		checkTime = checkTime.AddDate(0, 0, 1)
+		checkTime = time.Date(checkTime.Year(), checkTime.Month(), checkTime.Day(), 0, 0, 0, 0, checkTime.Location())
+	}
+	
+	// If we can't find an opening time in the next 7 days, just return the original time
+	return fromTime
+}
+
 // RouteOptimizer handles route optimization logic
 type RouteOptimizer struct {
-	locations         []Location
-	distanceCache     map[string]float64
+	locations          []Location
+	distanceCache      map[string]float64
 	visitTimeEstimator *VisitTimeEstimator
+	timeHelper         *TimeHelper
 }
 
 // NewRouteOptimizer creates a new optimizer instance
@@ -114,6 +276,7 @@ func NewRouteOptimizer(locations []Location) *RouteOptimizer {
 		locations:          locations,
 		distanceCache:      make(map[string]float64),
 		visitTimeEstimator: NewVisitTimeEstimator(),
+		timeHelper:         &TimeHelper{},
 	}
 }
 
@@ -300,13 +463,43 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 	}
 
 	if len(request.Locations) == 1 {
+		visitDuration := ro.visitTimeEstimator.EstimateVisitTime(request.Locations[0])
+		
+		// Create single location timing
+		locationTiming := LocationTiming{
+			Location:         request.Locations[0],
+			ArrivalTime:      "00:00", // Default time if no start time specified
+			VisitDurationMin: visitDuration,
+			DepartureTime:    "00:00",
+			TravelToNextMin:  0,
+		}
+		
+		// If start time is specified, use it
+		if request.StartTime != nil && *request.StartTime != "" {
+			if hour, min, err := ro.timeHelper.parseTimeString(*request.StartTime); err == nil {
+				now := time.Now()
+				startDateTime := time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
+				
+				// Check if location is open at start time
+				if !ro.timeHelper.isLocationOpen(request.Locations[0], startDateTime) {
+					startDateTime = ro.timeHelper.getNextOpenTime(request.Locations[0], startDateTime)
+				}
+				
+				locationTiming.ArrivalTime = startDateTime.Format("15:04")
+				locationTiming.DepartureTime = startDateTime.Add(time.Duration(visitDuration) * time.Minute).Format("15:04")
+			}
+		}
+		
 		return RouteResponse{
-			OptimizedRoute:   request.Locations,
-			TotalDistanceKm:  0,
-			EstimatedTimeMin: 0,
-			LocationCount:    1,
-			Algorithm:        "single-location",
-			Status:           "success",
+			OptimizedRoute:     request.Locations,
+			TotalDistanceKm:    0,
+			TotalTravelTimeMin: 0,
+			TotalVisitTimeMin:  visitDuration,
+			TotalTripTimeMin:   visitDuration,
+			LocationTimings:    []LocationTiming{locationTiming},
+			LocationCount:      1,
+			Algorithm:          "single-location",
+			Status:             "success",
 		}
 	}
 
@@ -342,15 +535,50 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 		improvementPct = ((originalDistance - optimizedDistance) / originalDistance) * 100
 	}
 
+	// Parse start time/date or use current time
+	startDateTime := time.Now()
+	if request.StartDate != nil && *request.StartDate != "" {
+		if request.StartTime != nil && *request.StartTime != "" {
+			// Parse full datetime
+			dateTimeStr := *request.StartDate + " " + *request.StartTime
+			if parsed, err := time.Parse("2006-01-02 15:04", dateTimeStr); err == nil {
+				startDateTime = parsed
+			}
+		} else {
+			// Just date, use 9 AM as default start time
+			if parsed, err := time.Parse("2006-01-02", *request.StartDate); err == nil {
+				startDateTime = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 9, 0, 0, 0, parsed.Location())
+			}
+		}
+	} else if request.StartTime != nil && *request.StartTime != "" {
+		// Just time, use today
+		if hour, min, err := ro.timeHelper.parseTimeString(*request.StartTime); err == nil {
+			now := time.Now()
+			startDateTime = time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, now.Location())
+		}
+	}
+
 	// Calculate travel time (assuming average speed of 40 km/h in city)
 	travelTimeMin := int(math.Ceil(optimizedDistance / 40.0 * 60))
 
-	// Calculate visit times and create detailed timing information
+	// Calculate visit times and create detailed timing information with operating hours
 	locationTimings := make([]LocationTiming, len(result))
 	totalVisitTime := 0
+	currentTime := startDateTime
 	
 	for i, location := range result {
 		visitDuration := ro.visitTimeEstimator.EstimateVisitTime(location)
+		
+		// Check if location is open at arrival time, adjust if necessary
+		if !ro.timeHelper.isLocationOpen(location, currentTime) {
+			// Find next open time and update current time
+			nextOpenTime := ro.timeHelper.getNextOpenTime(location, currentTime)
+			currentTime = nextOpenTime
+		}
+		
+		arrivalTime := currentTime.Format("15:04")
+		departureTime := currentTime.Add(time.Duration(visitDuration) * time.Minute).Format("15:04")
+		
 		totalVisitTime += visitDuration
 		
 		// Calculate travel time to next location
@@ -375,9 +603,14 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 		
 		locationTimings[i] = LocationTiming{
 			Location:         location,
+			ArrivalTime:      arrivalTime,
 			VisitDurationMin: visitDuration,
+			DepartureTime:    departureTime,
 			TravelToNextMin:  travelToNext,
 		}
+		
+		// Update current time for next location (departure time + travel time)
+		currentTime = currentTime.Add(time.Duration(visitDuration + travelToNext) * time.Minute)
 	}
 
 	totalTripTime := travelTimeMin + totalVisitTime
