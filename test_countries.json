@@ -1,0 +1,375 @@
+{
+  "european_summer": {
+    "countries": [
+      {
+        "code": "IT",
+        "name": "Italy",
+        "capital": "Rome",
+        "latitude": 41.8719,
+        "longitude": 12.5674,
+        "min_stay_days": 7,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "spring",
+            "start_month": 4,
+            "end_month": 6,
+            "description": "Mild weather, fewer crowds, perfect for sightseeing"
+          },
+          {
+            "name": "early_fall",
+            "start_month": 9,
+            "end_month": 10,
+            "description": "Pleasant temperatures, harvest season, ideal for food tours"
+          }
+        ],
+        "avoid_months": [7, 8]
+      },
+      {
+        "code": "FR",
+        "name": "France",
+        "capital": "Paris",
+        "latitude": 46.2276,
+        "longitude": 2.2137,
+        "min_stay_days": 6,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "spring",
+            "start_month": 5,
+            "end_month": 6,
+            "description": "Beautiful weather, blooming gardens, perfect for Paris and countryside"
+          },
+          {
+            "name": "fall",
+            "start_month": 9,
+            "end_month": 10,
+            "description": "Harvest season, wine country at its best"
+          }
+        ],
+        "avoid_months": [12, 1, 2]
+      },
+      {
+        "code": "ES",
+        "name": "Spain",
+        "capital": "Madrid",
+        "latitude": 40.4637,
+        "longitude": -3.7492,
+        "min_stay_days": 5,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "spring",
+            "start_month": 4,
+            "end_month": 6,
+            "description": "Perfect temperatures, Easter celebrations, ideal for all regions"
+          },
+          {
+            "name": "early_fall",
+            "start_month": 9,
+            "end_month": 10,
+            "description": "Warm but not hot, great for cities and beaches"
+          }
+        ],
+        "avoid_months": [7, 8]
+      },
+      {
+        "code": "GR",
+        "name": "Greece",
+        "capital": "Athens",
+        "latitude": 39.0742,
+        "longitude": 21.8243,
+        "min_stay_days": 6,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "late_spring",
+            "start_month": 5,
+            "end_month": 6,
+            "description": "Perfect weather for islands and ancient sites"
+          },
+          {
+            "name": "early_fall",
+            "start_month": 9,
+            "end_month": 10,
+            "description": "Warm sea, fewer crowds, ideal for island hopping"
+          }
+        ],
+        "avoid_months": [7, 8]
+      }
+    ],
+    "trip_start_date": "2024-05-01",
+    "trip_duration_days": 28,
+    "optimize_for": "season",
+    "return_to_start": true
+  },
+  "asian_winter_escape": {
+    "countries": [
+      {
+        "code": "TH",
+        "name": "Thailand",
+        "capital": "Bangkok",
+        "latitude": 15.8700,
+        "longitude": 100.9925,
+        "min_stay_days": 10,
+        "continent": "Asia",
+        "currency": "THB",
+        "ideal_seasons": [
+          {
+            "name": "cool_season",
+            "start_month": 11,
+            "end_month": 2,
+            "description": "Cool and dry, perfect for all activities"
+          }
+        ],
+        "avoid_months": [4, 5, 6, 7, 8, 9]
+      },
+      {
+        "code": "VN",
+        "name": "Vietnam",
+        "capital": "Hanoi",
+        "latitude": 14.0583,
+        "longitude": 108.2772,
+        "min_stay_days": 12,
+        "continent": "Asia",
+        "currency": "VND",
+        "ideal_seasons": [
+          {
+            "name": "dry_season",
+            "start_month": 11,
+            "end_month": 4,
+            "description": "Dry weather, perfect for north to south travel"
+          }
+        ],
+        "avoid_months": [6, 7, 8, 9]
+      },
+      {
+        "code": "KH",
+        "name": "Cambodia",
+        "capital": "Phnom Penh",
+        "latitude": 12.5657,
+        "longitude": 104.9910,
+        "min_stay_days": 7,
+        "continent": "Asia",
+        "currency": "KHR",
+        "ideal_seasons": [
+          {
+            "name": "dry_season",
+            "start_month": 11,
+            "end_month": 3,
+            "description": "Dry and cooler, ideal for Angkor Wat exploration"
+          }
+        ],
+        "avoid_months": [6, 7, 8, 9, 10]
+      },
+      {
+        "code": "JP",
+        "name": "Japan",
+        "capital": "Tokyo",
+        "latitude": 36.2048,
+        "longitude": 138.2529,
+        "min_stay_days": 10,
+        "continent": "Asia",
+        "currency": "JPY",
+        "ideal_seasons": [
+          {
+            "name": "winter",
+            "start_month": 12,
+            "end_month": 2,
+            "description": "Winter illuminations, skiing, fewer crowds"
+          },
+          {
+            "name": "spring",
+            "start_month": 3,
+            "end_month": 5,
+            "description": "Cherry blossom season, mild weather"
+          }
+        ],
+        "avoid_months": [6, 7, 8]
+      }
+    ],
+    "trip_start_date": "2024-12-01",
+    "trip_duration_days": 45,
+    "optimize_for": "balanced",
+    "return_to_start": false
+  },
+  "south_american_adventure": {
+    "countries": [
+      {
+        "code": "PE",
+        "name": "Peru",
+        "capital": "Lima",
+        "latitude": -9.1900,
+        "longitude": -75.0152,
+        "min_stay_days": 8,
+        "continent": "South America",
+        "currency": "PEN",
+        "ideal_seasons": [
+          {
+            "name": "dry_season",
+            "start_month": 5,
+            "end_month": 9,
+            "description": "Dry season in highlands, perfect for Machu Picchu and trekking"
+          }
+        ],
+        "avoid_months": [1, 2, 3]
+      },
+      {
+        "code": "BO",
+        "name": "Bolivia",
+        "capital": "La Paz",
+        "latitude": -16.2902,
+        "longitude": -63.5887,
+        "min_stay_days": 6,
+        "continent": "South America",
+        "currency": "BOB",
+        "ideal_seasons": [
+          {
+            "name": "dry_season",
+            "start_month": 5,
+            "end_month": 10,
+            "description": "Dry season, perfect for Salar de Uyuni and highlands"
+          }
+        ],
+        "avoid_months": [1, 2, 3]
+      },
+      {
+        "code": "CL",
+        "name": "Chile",
+        "capital": "Santiago",
+        "latitude": -35.6751,
+        "longitude": -71.5430,
+        "min_stay_days": 10,
+        "continent": "South America",
+        "currency": "CLP",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 12,
+            "end_month": 3,
+            "description": "Summer in southern hemisphere, perfect for Patagonia"
+          },
+          {
+            "name": "fall",
+            "start_month": 4,
+            "end_month": 5,
+            "description": "Harvest season, ideal for wine regions"
+          }
+        ],
+        "avoid_months": [6, 7, 8]
+      },
+      {
+        "code": "AR",
+        "name": "Argentina",
+        "capital": "Buenos Aires",
+        "latitude": -38.4161,
+        "longitude": -63.6167,
+        "min_stay_days": 9,
+        "continent": "South America",
+        "currency": "ARS",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 12,
+            "end_month": 3,
+            "description": "Summer season, perfect for Patagonia and wine harvest"
+          },
+          {
+            "name": "fall",
+            "start_month": 4,
+            "end_month": 5,
+            "description": "Mild weather, wine harvest in Mendoza"
+          }
+        ],
+        "avoid_months": [6, 7, 8]
+      }
+    ],
+    "trip_start_date": "2024-06-01",
+    "trip_duration_days": 35,
+    "optimize_for": "season",
+    "return_to_start": false
+  },
+  "distance_optimized_example": {
+    "countries": [
+      {
+        "code": "DE",
+        "name": "Germany",
+        "capital": "Berlin",
+        "latitude": 51.1657,
+        "longitude": 10.4515,
+        "min_stay_days": 5,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 6,
+            "end_month": 8,
+            "description": "Warm weather, long days, festival season"
+          }
+        ]
+      },
+      {
+        "code": "AT",
+        "name": "Austria",
+        "capital": "Vienna",
+        "latitude": 47.5162,
+        "longitude": 14.5501,
+        "min_stay_days": 4,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 6,
+            "end_month": 8,
+            "description": "Perfect for Alpine activities and city exploration"
+          }
+        ]
+      },
+      {
+        "code": "CH",
+        "name": "Switzerland",
+        "capital": "Bern",
+        "latitude": 46.8182,
+        "longitude": 8.2275,
+        "min_stay_days": 5,
+        "continent": "Europe",
+        "currency": "CHF",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 6,
+            "end_month": 9,
+            "description": "Alpine hiking season, perfect weather"
+          }
+        ]
+      },
+      {
+        "code": "CZ",
+        "name": "Czech Republic",
+        "capital": "Prague",
+        "latitude": 49.8175,
+        "longitude": 15.4730,
+        "min_stay_days": 3,
+        "continent": "Europe",
+        "currency": "CZK",
+        "ideal_seasons": [
+          {
+            "name": "summer",
+            "start_month": 5,
+            "end_month": 9,
+            "description": "Warm weather, outdoor activities, beer gardens"
+          }
+        ]
+      }
+    ],
+    "trip_start_date": "2024-07-01",
+    "optimize_for": "distance",
+    "return_to_start": true
+  }
+}

@@ -93,6 +93,7 @@ Available endpoints:
 - `GET /api/v1/hello` - Returns a hello world message
 - `GET /api/v1/health` - Returns server health status
 - `POST /api/v1/optimize-route` - Optimizes a route for visiting multiple locations
+- `POST /api/v1/optimize-countries` - Optimizes multi-country travel routes with seasonal planning
 
 ## Example Responses
 
@@ -317,6 +318,159 @@ Operating hours should be specified in 24-hour format using the pattern `"HH:MM-
 - Closed days are handled by finding the next available day
 - Late-night hours (crossing midnight) are supported
 
+### Country Route Optimization Endpoint
+
+Optimize multi-country travel routes based on distance and ideal travel seasons.
+
+```bash
+curl -X POST http://localhost:8081/api/v1/optimize-countries \
+  -H "Content-Type: application/json" \
+  -d '{
+    "countries": [
+      {
+        "code": "IT",
+        "name": "Italy",
+        "capital": "Rome",
+        "latitude": 41.8719,
+        "longitude": 12.5674,
+        "min_stay_days": 7,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "spring",
+            "start_month": 4,
+            "end_month": 6,
+            "description": "Mild weather, fewer crowds"
+          }
+        ],
+        "avoid_months": [7, 8]
+      },
+      {
+        "code": "FR",
+        "name": "France",
+        "capital": "Paris",
+        "latitude": 46.2276,
+        "longitude": 2.2137,
+        "min_stay_days": 6,
+        "continent": "Europe",
+        "currency": "EUR",
+        "ideal_seasons": [
+          {
+            "name": "spring",
+            "start_month": 5,
+            "end_month": 6,
+            "description": "Beautiful weather, blooming gardens"
+          }
+        ]
+      }
+    ],
+    "trip_start_date": "2024-05-01",
+    "trip_duration_days": 21,
+    "optimize_for": "season",
+    "return_to_start": true
+  }'
+```
+
+Response:
+```json
+{
+  "optimized_route": [
+    {
+      "code": "IT",
+      "name": "Italy",
+      "capital": "Rome",
+      "latitude": 41.8719,
+      "longitude": 12.5674,
+      "min_stay_days": 7,
+      "continent": "Europe"
+    },
+    {
+      "code": "FR", 
+      "name": "France",
+      "capital": "Paris",
+      "latitude": 46.2276,
+      "longitude": 2.2137,
+      "min_stay_days": 6,
+      "continent": "Europe"
+    }
+  ],
+  "country_timings": [
+    {
+      "country": {"code": "IT", "name": "Italy"},
+      "arrival_date": "2024-05-01",
+      "departure_date": "2024-05-11",
+      "stay_duration_days": 10,
+      "season": "spring",
+      "weather_rating": 10,
+      "seasonal_notes": "Mild weather, fewer crowds",
+      "travel_to_next_days": 1
+    },
+    {
+      "country": {"code": "FR", "name": "France"},
+      "arrival_date": "2024-05-12",
+      "departure_date": "2024-05-23",
+      "stay_duration_days": 11,
+      "season": "spring", 
+      "weather_rating": 10,
+      "seasonal_notes": "Beautiful weather, blooming gardens",
+      "travel_to_next_days": 0
+    }
+  ],
+  "total_distance_km": 1105.67,
+  "total_trip_days": 22,
+  "total_travel_days": 1,
+  "total_stay_days": 21,
+  "seasonal_score": 100.0,
+  "distance_score": 85.2,
+  "overall_score": 100.0,
+  "algorithm_used": "nearest-neighbor + 2-opt + seasonal-weighting",
+  "optimization_focus": "season",
+  "country_count": 2,
+  "status": "success"
+}
+```
+
+#### Country Route Optimization Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `countries` | Array | Yes | Array of country objects (max 20) |
+| `countries[].code` | String | Yes | ISO country code (e.g., "US", "FR") |
+| `countries[].name` | String | Yes | Full country name |
+| `countries[].capital` | String | No | Capital city name |
+| `countries[].latitude` | Number | Yes | Country center latitude |
+| `countries[].longitude` | Number | Yes | Country center longitude |
+| `countries[].min_stay_days` | Number | No | Minimum recommended stay (default: 3) |
+| `countries[].continent` | String | No | Continent name |
+| `countries[].currency` | String | No | Primary currency code |
+| `countries[].ideal_seasons` | Array | No | Array of ideal travel seasons |
+| `countries[].avoid_months` | Array | No | Months to avoid (1-12) |
+| `start_country` | String | No | Country code to start from |
+| `trip_start_date` | String | No | Trip start date (YYYY-MM-DD) |
+| `trip_duration_days` | Number | No | Total trip duration in days |
+| `optimize_for` | String | No | "distance", "season", or "balanced" (default) |
+| `return_to_start` | Boolean | No | Whether to return to starting country |
+
+#### Optimization Strategies
+
+- **distance**: Minimizes total travel distance between countries
+- **season**: Optimizes for ideal travel seasons and weather
+- **balanced**: 60% seasonal optimization + 40% distance optimization
+
+#### Seasonal Data Format
+
+```json
+"ideal_seasons": [
+  {
+    "name": "spring",
+    "start_month": 4,
+    "end_month": 6,
+    "description": "Mild weather, fewer crowds"
+  }
+]
+```
+
 ## Building for Production
 
 ### Docker Production Build
@@ -365,6 +519,7 @@ The application includes two middleware components:
 
 ## Route Optimization Features
 
+### Location-Level Optimization
 - **Algorithm**: Nearest Neighbor + 2-Opt optimization
 - **Capacity**: Supports up to 50 locations efficiently
 - **Performance**: Typically optimizes routes in 10-50ms
@@ -375,7 +530,22 @@ The application includes two middleware components:
 - **Time-Aware Planning**: Automatically waits for closed locations to open
 - **Detailed Timing**: Real arrival/departure times with travel time separation
 - **Flexible Scheduling**: Supports custom start times and dates
-- **Comprehensive Metrics**: Distance, time estimates, and improvement statistics
+
+### Country-Level Optimization
+- **Multi-Country Planning**: Optimizes routes across up to 20 countries
+- **Seasonal Intelligence**: Considers ideal travel seasons and weather patterns
+- **Distance Optimization**: Minimizes travel distances between countries
+- **Balanced Approach**: Combines seasonal and distance factors
+- **Weather Ratings**: Provides 1-10 weather ratings for each country visit
+- **Trip Duration Planning**: Distributes time optimally across countries
+- **Seasonal Avoidance**: Automatically avoids unfavorable travel periods
+- **Continental Awareness**: Understands regional travel patterns
+
+### Comprehensive Metrics
+- Distance, time estimates, and improvement statistics
+- Seasonal optimization scores and weather ratings
+- Travel vs. stay time breakdowns
+- Multiple optimization strategy comparisons
 
 ## Testing
 
