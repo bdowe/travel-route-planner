@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -22,6 +24,7 @@ type HealthResponse struct {
 	Status    string    `json:"status"`
 	Timestamp time.Time `json:"timestamp"`
 	Service   string    `json:"service"`
+	Database  string    `json:"database"`
 }
 
 // loggingMiddleware logs incoming requests
@@ -70,14 +73,29 @@ func helloHandler(w http.ResponseWriter, r *http.Request) {
 
 // healthHandler handles health check endpoint
 func healthHandler(w http.ResponseWriter, r *http.Request) {
+	status := "healthy"
+	database := "ok"
+	httpStatus := http.StatusOK
+
+	if !pingDB(r.Context()) {
+		status = "degraded"
+		httpStatus = http.StatusServiceUnavailable
+		if dbPool == nil {
+			database = "not configured"
+		} else {
+			database = "unreachable"
+		}
+	}
+
 	response := HealthResponse{
-		Status:    "healthy",
+		Status:    status,
 		Timestamp: time.Now(),
 		Service:   "travel-route-planner-api",
+		Database:  database,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(httpStatus)
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -459,6 +477,42 @@ func summarizeStructure(node interface{}, depth int) interface{} {
 }
 
 func main() {
+	ctx := context.Background()
+	dbURL := os.Getenv("DATABASE_URL")
+
+	// `migrate` subcommand: apply migrations and exit (used by `make api-migrate`).
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		if dbURL == "" {
+			log.Fatal("DATABASE_URL is required to run migrations")
+		}
+		if err := runMigrations(dbURL); err != nil {
+			log.Fatalf("Migration failed: %v", err)
+		}
+		log.Println("Migrations applied successfully")
+		return
+	}
+
+	// Connect to the database. Missing/unreachable DB -> degraded mode (the API
+	// still serves stateless endpoints). A migration failure on a reachable DB is
+	// a real error -> exit non-zero.
+	switch {
+	case dbURL == "":
+		log.Println("WARNING: DATABASE_URL not set - starting without a database; persistence features unavailable")
+	default:
+		pool, err := initDB(ctx, dbURL)
+		if err != nil {
+			log.Printf("WARNING: database unreachable (%v) - starting in degraded mode; persistence features unavailable", err)
+			break
+		}
+		if err := runMigrations(dbURL); err != nil {
+			pool.Close()
+			log.Fatalf("Database migration failed: %v", err)
+		}
+		dbPool = pool
+		defer dbPool.Close()
+		log.Println("Connected to database; migrations applied")
+	}
+
 	// Create a new router
 	router := mux.NewRouter()
 

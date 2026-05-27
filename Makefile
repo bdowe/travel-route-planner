@@ -71,6 +71,12 @@ api-fmt: ## Format Go code
 api-vet: ## Run go vet
 	cd $(API_DIR) && go vet ./...
 
+api-migrate: ## Apply database migrations (needs DATABASE_URL; runs on boot too)
+	cd $(API_DIR) && go run . migrate
+
+api-sqlc: ## Generate type-safe DB code from SQL (needs sqlc: https://sqlc.dev)
+	cd $(API_DIR) && sqlc generate
+
 # Flutter commands
 flutter-deps: ## Install Flutter dependencies
 	cd $(FLUTTER_DIR) && flutter pub get
