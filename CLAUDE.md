@@ -10,6 +10,14 @@ A travel route planning platform with two packages:
 
 A single **nginx gateway** on port **3000** serves the Flutter UI and proxies `/api/v1/` to the Go API, keeping everything same-origin.
 
+## Spec-Driven Development
+
+Non-trivial features start as a spec under `specs/<feature-name>/` (copied from
+`specs/_template/`). Before implementing a feature, read its `spec.md` (what &
+why) and `plan.md` (how); treat the spec's acceptance criteria as the definition
+of done and surface any `[NEEDS CLARIFICATION]` before starting. See
+[`specs/README.md`](specs/README.md) for the workflow.
+
 ## Common Commands
 
 ```bash
