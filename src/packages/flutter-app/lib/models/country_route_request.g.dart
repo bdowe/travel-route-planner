@@ -19,12 +19,12 @@ CountryRouteRequest _$CountryRouteRequestFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$CountryRouteRequestToJson(
-  CountryRouteRequest instance,
-) => <String, dynamic>{
-  'countries': instance.countries,
-  'start_country': instance.startCountry,
-  'trip_start_date': instance.tripStartDate,
-  'trip_duration_days': instance.tripDurationDays,
-  'optimize_for': instance.optimizeFor,
-  'return_to_start': instance.returnToStart,
-};
+        CountryRouteRequest instance) =>
+    <String, dynamic>{
+      'countries': instance.countries,
+      'start_country': instance.startCountry,
+      'trip_start_date': instance.tripStartDate,
+      'trip_duration_days': instance.tripDurationDays,
+      'optimize_for': instance.optimizeFor,
+      'return_to_start': instance.returnToStart,
+    };

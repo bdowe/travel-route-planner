@@ -12,8 +12,8 @@ CountryTiming _$CountryTimingFromJson(Map<String, dynamic> json) =>
       arrivalDate: json['arrival_date'] as String,
       departureDate: json['departure_date'] as String,
       stayDays: (json['stay_days'] as num).toInt(),
-      travelDaysFromPrevious: (json['travel_days_from_previous'] as num)
-          .toInt(),
+      travelDaysFromPrevious:
+          (json['travel_days_from_previous'] as num).toInt(),
       seasonalScore: (json['seasonal_score'] as num).toDouble(),
     );
 

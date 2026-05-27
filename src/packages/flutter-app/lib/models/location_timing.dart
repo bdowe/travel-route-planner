@@ -7,24 +7,24 @@ part 'location_timing.g.dart';
 class LocationTiming {
   final Location location;
   
-  @JsonKey(name: 'arrival_time')
+  @JsonKey(name: 'arrival_time', defaultValue: '')
   final String arrivalTime;
-  
-  @JsonKey(name: 'departure_time')
+
+  @JsonKey(name: 'departure_time', defaultValue: '')
   final String departureTime;
-  
+
   @JsonKey(name: 'visit_duration_minutes')
   final int visitDurationMin;
-  
-  @JsonKey(name: 'travel_from_previous_minutes')
-  final int travelFromPreviousMin;
+
+  @JsonKey(name: 'travel_to_next_minutes', defaultValue: 0)
+  final int travelToNextMin;
 
   const LocationTiming({
     required this.location,
     required this.arrivalTime,
     required this.departureTime,
     required this.visitDurationMin,
-    required this.travelFromPreviousMin,
+    required this.travelToNextMin,
   });
 
   factory LocationTiming.fromJson(Map<String, dynamic> json) =>
@@ -34,7 +34,7 @@ class LocationTiming {
 
   @override
   String toString() {
-    return 'LocationTiming(location: ${location.name}, arrivalTime: $arrivalTime, departureTime: $departureTime, visitDurationMin: $visitDurationMin, travelFromPreviousMin: $travelFromPreviousMin)';
+    return 'LocationTiming(location: ${location.name}, arrivalTime: $arrivalTime, departureTime: $departureTime, visitDurationMin: $visitDurationMin, travelToNextMin: $travelToNextMin)';
   }
 
   @override
@@ -45,7 +45,7 @@ class LocationTiming {
         other.arrivalTime == arrivalTime &&
         other.departureTime == departureTime &&
         other.visitDurationMin == visitDurationMin &&
-        other.travelFromPreviousMin == travelFromPreviousMin;
+        other.travelToNextMin == travelToNextMin;
   }
 
   @override
@@ -54,6 +54,6 @@ class LocationTiming {
         arrivalTime.hashCode ^
         departureTime.hashCode ^
         visitDurationMin.hashCode ^
-        travelFromPreviousMin.hashCode;
+        travelToNextMin.hashCode;
   }
 }

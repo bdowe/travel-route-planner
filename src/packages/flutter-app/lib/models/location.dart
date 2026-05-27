@@ -7,8 +7,12 @@ part 'location.g.dart';
 class Location {
   final String id;
   final String name;
-  final double latitude;
-  final double longitude;
+  
+  @JsonKey(name: 'place_id')
+  final String? placeId;
+  
+  final double? latitude;
+  final double? longitude;
   final String? address;
   final String? category;
   
@@ -20,8 +24,9 @@ class Location {
   const Location({
     required this.id,
     required this.name,
-    required this.latitude,
-    required this.longitude,
+    this.placeId,
+    this.latitude,
+    this.longitude,
     this.address,
     this.category,
     this.visitDurationMinutes,
@@ -36,6 +41,7 @@ class Location {
   Location copyWith({
     String? id,
     String? name,
+    String? placeId,
     double? latitude,
     double? longitude,
     String? address,
@@ -46,6 +52,7 @@ class Location {
     return Location(
       id: id ?? this.id,
       name: name ?? this.name,
+      placeId: placeId ?? this.placeId,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       address: address ?? this.address,
@@ -57,7 +64,7 @@ class Location {
 
   @override
   String toString() {
-    return 'Location(id: $id, name: $name, latitude: $latitude, longitude: $longitude, address: $address, category: $category, visitDurationMinutes: $visitDurationMinutes, hours: $hours)';
+    return 'Location(id: $id, name: $name, placeId: $placeId, latitude: $latitude, longitude: $longitude, address: $address, category: $category, visitDurationMinutes: $visitDurationMinutes, hours: $hours)';
   }
 
   @override
@@ -66,6 +73,7 @@ class Location {
     return other is Location &&
         other.id == id &&
         other.name == name &&
+        other.placeId == placeId &&
         other.latitude == latitude &&
         other.longitude == longitude &&
         other.address == address &&
@@ -78,6 +86,7 @@ class Location {
   int get hashCode {
     return id.hashCode ^
         name.hashCode ^
+        placeId.hashCode ^
         latitude.hashCode ^
         longitude.hashCode ^
         address.hashCode ^

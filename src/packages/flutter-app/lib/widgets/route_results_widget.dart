@@ -153,10 +153,15 @@ class RouteResultsWidget extends StatelessWidget {
                       final timing = response.locationTimings[index];
                       final isLast = index == response.locationTimings.length - 1;
                       
+                      final travelFromPrevious = index > 0
+                          ? response.locationTimings[index - 1].travelToNextMin
+                          : 0;
+
                       return _TimelineItem(
                         timing: timing,
                         index: index,
                         isLast: isLast,
+                        travelFromPreviousMin: travelFromPrevious,
                       );
                     },
                   ),
@@ -224,11 +229,13 @@ class _TimelineItem extends StatelessWidget {
   final LocationTiming timing;
   final int index;
   final bool isLast;
+  final int travelFromPreviousMin;
 
   const _TimelineItem({
     required this.timing,
     required this.index,
     required this.isLast,
+    required this.travelFromPreviousMin,
   });
 
   @override
@@ -329,7 +336,7 @@ class _TimelineItem extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (index > 0 && timing.travelFromPreviousMin > 0) ...[
+                if (index > 0 && travelFromPreviousMin > 0) ...[
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -340,7 +347,7 @@ class _TimelineItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${timing.travelFromPreviousMin} min from previous',
+                        '$travelFromPreviousMin min from previous',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.orange,
                         ),

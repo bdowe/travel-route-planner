@@ -83,7 +83,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 // optimizeRouteHandler handles route optimization requests
 func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 	var request RouteRequest
-	
+
 	// Parse JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -94,7 +94,7 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Validate input
 	if len(request.Locations) == 0 {
 		w.Header().Set("Content-Type", "application/json")
@@ -105,7 +105,7 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	if len(request.Locations) > 50 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -115,7 +115,7 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Validate location data
 	for i, location := range request.Locations {
 		if location.ID == "" {
@@ -127,26 +127,27 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		if location.Latitude < -90 || location.Latitude > 90 {
+		// Only validate coordinates if they are provided (not using place name resolution)
+		if location.Latitude != nil && (*location.Latitude < -90 || *location.Latitude > 90) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(Response{
-				Message: fmt.Sprintf("Location %d has invalid latitude: %f", i, location.Latitude),
+				Message: fmt.Sprintf("Location %d has invalid latitude: %f", i, *location.Latitude),
 				Status:  "error",
 			})
 			return
 		}
-		if location.Longitude < -180 || location.Longitude > 180 {
+		if location.Longitude != nil && (*location.Longitude < -180 || *location.Longitude > 180) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(Response{
-				Message: fmt.Sprintf("Location %d has invalid longitude: %f", i, location.Longitude),
+				Message: fmt.Sprintf("Location %d has invalid longitude: %f", i, *location.Longitude),
 				Status:  "error",
 			})
 			return
 		}
 	}
-	
+
 	// Validate start index if provided
 	if request.StartIndex != nil {
 		if *request.StartIndex < 0 || *request.StartIndex >= len(request.Locations) {
@@ -159,11 +160,11 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Create optimizer and process request
 	optimizer := NewRouteOptimizer(request.Locations)
 	result := optimizer.OptimizeRoute(request)
-	
+
 	// Return result
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -173,7 +174,7 @@ func optimizeRouteHandler(w http.ResponseWriter, r *http.Request) {
 // optimizeCountriesHandler handles country route optimization requests
 func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 	var request CountryRouteRequest
-	
+
 	// Parse JSON request body
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -184,7 +185,7 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Validate input
 	if len(request.Countries) == 0 {
 		w.Header().Set("Content-Type", "application/json")
@@ -195,7 +196,7 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	if len(request.Countries) > 20 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -205,7 +206,7 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Validate country data
 	for i, country := range request.Countries {
 		if country.Code == "" {
@@ -249,7 +250,7 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 			request.Countries[i].MinStayDays = 3
 		}
 	}
-	
+
 	// Validate optimization focus
 	validOptimizations := map[string]bool{
 		"distance": true,
@@ -266,7 +267,7 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	
+
 	// Validate start country if provided
 	if request.StartCountry != nil {
 		found := false
@@ -286,11 +287,11 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	// Create optimizer and process request
 	optimizer := NewCountryOptimizer(request.Countries)
 	result := optimizer.optimizeCountryRoute(request)
-	
+
 	// Return result
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

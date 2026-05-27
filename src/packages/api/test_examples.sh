@@ -3,7 +3,7 @@
 # Test Examples for Travel Route Planner API
 # Make sure the server is running first: go run main.go route_optimizer.go
 
-BASE_URL="http://localhost:8081"  # Updated for docker-compose port
+BASE_URL="${BASE_URL:-http://localhost:3000}"  # Docker gateway; use http://localhost:8080 for bare api-run
 API_BASE="$BASE_URL/api/v1"
 
 echo "🚀 Testing Travel Route Planner API"

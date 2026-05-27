@@ -7,14 +7,14 @@ part of 'route_request.dart';
 // **************************************************************************
 
 RouteRequest _$RouteRequestFromJson(Map<String, dynamic> json) => RouteRequest(
-  locations: (json['locations'] as List<dynamic>)
-      .map((e) => Location.fromJson(e as Map<String, dynamic>))
-      .toList(),
-  startIndex: (json['start_index'] as num?)?.toInt(),
-  returnToStart: json['return_to_start'] as bool,
-  startTime: json['start_time'] as String?,
-  startDate: json['start_date'] as String?,
-);
+      locations: (json['locations'] as List<dynamic>)
+          .map((e) => Location.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      startIndex: (json['start_index'] as num?)?.toInt(),
+      returnToStart: json['return_to_start'] as bool,
+      startTime: json['start_time'] as String?,
+      startDate: json['start_date'] as String?,
+    );
 
 Map<String, dynamic> _$RouteRequestToJson(RouteRequest instance) =>
     <String, dynamic>{

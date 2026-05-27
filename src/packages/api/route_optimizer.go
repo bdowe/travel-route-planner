@@ -23,8 +23,9 @@ type OperatingHours struct {
 type Location struct {
 	ID                 string           `json:"id"`
 	Name               string           `json:"name"`
-	Latitude           float64          `json:"latitude"`
-	Longitude          float64          `json:"longitude"`
+	PlaceID            string           `json:"place_id,omitempty"`          // Google Places ID for lookups
+	Latitude           *float64         `json:"latitude,omitempty"`          // Optional - can be resolved from place_id
+	Longitude          *float64         `json:"longitude,omitempty"`         // Optional - can be resolved from place_id
 	Address            string           `json:"address,omitempty"`
 	Category           string           `json:"category,omitempty"`           // e.g., "coffee_shop", "museum", "restaurant"
 	VisitDurationMin   *int             `json:"visit_duration_minutes,omitempty"` // Optional override for visit time
@@ -319,7 +320,11 @@ func (ro *RouteOptimizer) getDistance(i, j int) float64 {
 
 	loc1 := ro.locations[i]
 	loc2 := ro.locations[j]
-	dist := ro.haversineDistance(loc1.Latitude, loc1.Longitude, loc2.Latitude, loc2.Longitude)
+	// Ensure both locations have coordinates
+	if loc1.Latitude == nil || loc1.Longitude == nil || loc2.Latitude == nil || loc2.Longitude == nil {
+		return 0 // or return an error - for now return 0 to avoid breaking
+	}
+	dist := ro.haversineDistance(*loc1.Latitude, *loc1.Longitude, *loc2.Latitude, *loc2.Longitude)
 	ro.distanceCache[key] = dist
 	return dist
 }
@@ -455,10 +460,81 @@ func (ro *RouteOptimizer) findLocationIndex(locationID string) int {
 }
 
 // OptimizeRoute is the main function to optimize a route
+// resolveLocation resolves a location's coordinates and details from Google Places API
+func (ro *RouteOptimizer) resolveLocation(location *Location, placesService *GooglePlacesService) error {
+	// If we already have coordinates, no need to resolve
+	if location.Latitude != nil && location.Longitude != nil {
+		return nil
+	}
+	
+	var placeDetails *PlaceDetailsResult
+	var err error
+	
+	// Try to get details by Place ID first
+	if location.PlaceID != "" {
+		placeDetails, err = placesService.GetPlaceDetails(location.PlaceID)
+		if err != nil {
+			return fmt.Errorf("failed to get place details for place_id %s: %w", location.PlaceID, err)
+		}
+	} else if location.Name != "" {
+		// Search by name if no Place ID
+		searchResults, err := placesService.SearchPlaces(location.Name)
+		if err != nil {
+			return fmt.Errorf("failed to search for place '%s': %w", location.Name, err)
+		}
+		if len(searchResults) == 0 {
+			return fmt.Errorf("no places found for '%s'", location.Name)
+		}
+		
+		// Use the first result and get detailed info
+		firstResult := searchResults[0]
+		placeDetails, err = placesService.GetPlaceDetails(firstResult.PlaceID)
+		if err != nil {
+			return fmt.Errorf("failed to get place details for '%s': %w", location.Name, err)
+		}
+	} else {
+		return fmt.Errorf("location must have either place_id or name for resolution")
+	}
+	
+	// Update location with resolved data
+	location.PlaceID = placeDetails.PlaceID
+	location.Latitude = &placeDetails.Latitude
+	location.Longitude = &placeDetails.Longitude
+	
+	// Update address if not provided
+	if location.Address == "" {
+		location.Address = placeDetails.Address
+	}
+	
+	// Update category if not provided
+	if location.Category == "" {
+		location.Category = MapGoogleTypeToCategory(placeDetails.Types)
+	}
+	
+	// Update operating hours if not provided
+	if location.Hours == nil {
+		location.Hours = ConvertGoogleHoursToOperatingHours(placeDetails.OpeningHours)
+	}
+	
+	return nil
+}
+
 func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 	if len(request.Locations) == 0 {
 		return RouteResponse{
 			Status: "error: no locations provided",
+		}
+	}
+
+	// Initialize Google Places service
+	placesService := NewGooglePlacesService()
+	
+	// Resolve locations that don't have coordinates
+	for i := range request.Locations {
+		if err := ro.resolveLocation(&request.Locations[i], placesService); err != nil {
+			return RouteResponse{
+				Status: fmt.Sprintf("error resolving location '%s': %v", request.Locations[i].Name, err),
+			}
 		}
 	}
 
