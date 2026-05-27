@@ -205,23 +205,31 @@ class RouteOptimizerScreen extends ConsumerWidget {
     );
   }
 
-  void _showAddLocationDialog(BuildContext context, RouteNotifier notifier) {
-    showDialog(
+  void _showAddLocationDialog(BuildContext context, RouteNotifier notifier) async {
+    final result = await showDialog<Location>(
       context: context,
       builder: (context) => LocationInputDialog(
         onLocationAdded: notifier.addLocation,
       ),
     );
+    
+    if (result != null) {
+      notifier.addLocation(result);
+    }
   }
 
-  void _showEditLocationDialog(BuildContext context, RouteNotifier notifier, int index, Location location) {
-    showDialog(
+  void _showEditLocationDialog(BuildContext context, RouteNotifier notifier, int index, Location location) async {
+    final result = await showDialog<Location>(
       context: context,
       builder: (context) => LocationInputDialog(
         initialLocation: location,
         onLocationAdded: (updatedLocation) => notifier.updateLocation(index, updatedLocation),
       ),
     );
+    
+    if (result != null) {
+      notifier.updateLocation(index, result);
+    }
   }
 
   void _showClearConfirmation(BuildContext context, RouteNotifier notifier) {
@@ -312,7 +320,7 @@ class _LocationCard extends StatelessWidget {
               ],
             ),
             Text(
-              '${location.latitude.toStringAsFixed(4)}, ${location.longitude.toStringAsFixed(4)}',
+              '${location.latitude?.toStringAsFixed(4) ?? 'N/A'}, ${location.longitude?.toStringAsFixed(4) ?? 'N/A'}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],

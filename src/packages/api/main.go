@@ -44,7 +44,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Accept")
+		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -298,6 +299,75 @@ func optimizeCountriesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// placesSearchHandler handles place search requests
+func placesSearchHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		http.Error(w, "Missing query parameter 'q'", http.StatusBadRequest)
+		return
+	}
+
+	placesService := NewGooglePlacesService()
+	results, err := placesService.SearchPlaces(query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to search places: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"results": results,
+		"status":  "success",
+	})
+}
+
+// placesAutocompleteHandler handles place autocomplete requests
+func placesAutocompleteHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	input := r.URL.Query().Get("input")
+	if input == "" {
+		http.Error(w, "Missing query parameter 'input'", http.StatusBadRequest)
+		return
+	}
+
+	placesService := NewGooglePlacesService()
+	results, err := placesService.GetPlaceAutocomplete(input)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get autocomplete: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"predictions": results,
+		"status":      "success",
+	})
+}
+
+// placesDetailsHandler handles place details requests
+func placesDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	placeID := r.URL.Query().Get("place_id")
+	if placeID == "" {
+		http.Error(w, "Missing query parameter 'place_id'", http.StatusBadRequest)
+		return
+	}
+
+	placesService := NewGooglePlacesService()
+	result, err := placesService.GetPlaceDetails(placeID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to get place details: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"result": result,
+		"status": "success",
+	})
+}
+
 func main() {
 	// Create a new router
 	router := mux.NewRouter()
@@ -317,6 +387,9 @@ func main() {
 	api.HandleFunc("/health", healthHandler).Methods("GET")
 	api.HandleFunc("/optimize-route", optimizeRouteHandler).Methods("POST")
 	api.HandleFunc("/optimize-countries", optimizeCountriesHandler).Methods("POST")
+	api.HandleFunc("/places/search", placesSearchHandler).Methods("GET")
+	api.HandleFunc("/places/autocomplete", placesAutocompleteHandler).Methods("GET")
+	api.HandleFunc("/places/details", placesDetailsHandler).Methods("GET")
 
 	// Server configuration
 	port := "8080"
@@ -337,6 +410,9 @@ func main() {
 	log.Printf("  GET /api/v1/health           - Health Check (v1)")
 	log.Printf("  POST /api/v1/optimize-route     - Route Optimization")
 	log.Printf("  POST /api/v1/optimize-countries - Country Route Optimization")
+	log.Printf("  GET  /api/v1/places/search      - Search Places")
+	log.Printf("  GET  /api/v1/places/autocomplete - Place Autocomplete")
+	log.Printf("  GET  /api/v1/places/details     - Place Details")
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("Server failed to start:", err)

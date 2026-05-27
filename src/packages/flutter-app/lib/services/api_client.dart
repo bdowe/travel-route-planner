@@ -6,7 +6,9 @@ import '../models/country_route_request.dart';
 import '../models/country_route_response.dart';
 
 class ApiClient {
-  static const String _defaultBaseUrl = 'http://localhost:8081/api/v1';
+  /// Default for local `flutter run` without Docker gateway.
+  /// Docker stacks use `--dart-define=API_BASE_URL=/api/v1` (same-origin).
+  static const String _defaultBaseUrl = 'http://localhost:8080/api/v1';
   static const Duration _timeout = Duration(seconds: 30);
   
   late final String _baseUrl;
@@ -17,6 +19,10 @@ class ApiClient {
     _baseUrl = baseUrl ?? 
         const String.fromEnvironment('API_BASE_URL', defaultValue: _defaultBaseUrl);
   }
+
+  // Public getters for external access
+  String get baseUrl => _baseUrl;
+  http.Client get httpClient => _client;
 
   /// Optimize a route for locations
   Future<RouteResponse> optimizeRoute(RouteRequest request) async {
@@ -33,8 +39,16 @@ class ApiClient {
           .timeout(_timeout);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonData = jsonDecode(response.body);
-        return RouteResponse.fromJson(jsonData);
+        try {
+          final Map<String, dynamic> jsonData = jsonDecode(response.body);
+          return RouteResponse.fromJson(jsonData);
+        } catch (e) {
+          throw ApiException(
+            statusCode: 0,
+            message: 'Failed to parse route response: $e',
+            endpoint: 'optimize-route',
+          );
+        }
       } else {
         throw ApiException(
           statusCode: response.statusCode,
