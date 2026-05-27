@@ -368,6 +368,96 @@ func placesDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func airbnbParseHandler(w http.ResponseWriter, r *http.Request) {
+	var req AirbnbParseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{Message: fmt.Sprintf("Invalid JSON: %v", err), Status: "error"})
+		return
+	}
+	if req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{Message: "url is required", Status: "error"})
+		return
+	}
+
+	svc := NewAirbnbService()
+	listing, err := svc.ParseListing(req.URL)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(Response{Message: err.Error(), Status: "error"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(listing)
+}
+
+// airbnbDebugHandler returns a summarized key-tree of window.__NEXT_DATA__ so
+// we can identify the correct field paths without parsing megabytes of JSON.
+func airbnbDebugHandler(w http.ResponseWriter, r *http.Request) {
+	var req AirbnbParseRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{Message: fmt.Sprintf("Invalid JSON: %v", err), Status: "error"})
+		return
+	}
+	if req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{Message: "url is required", Status: "error"})
+		return
+	}
+
+	svc := NewAirbnbService()
+	result, err := svc.FetchDebugInfo(req.URL)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(Response{Message: err.Error(), Status: "error"})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// summarizeStructure recursively builds a key-tree of the data to the given
+// depth. Objects become their key maps, arrays show count + first element,
+// strings are truncated to 120 chars, primitives are shown as-is.
+func summarizeStructure(node interface{}, depth int) interface{} {
+	if depth == 0 {
+		return "…"
+	}
+	switch v := node.(type) {
+	case map[string]interface{}:
+		out := make(map[string]interface{}, len(v))
+		for k, val := range v {
+			out[k] = summarizeStructure(val, depth-1)
+		}
+		return out
+	case []interface{}:
+		if len(v) == 0 {
+			return []interface{}{}
+		}
+		return map[string]interface{}{
+			"_count": len(v),
+			"_first": summarizeStructure(v[0], depth-1),
+		}
+	case string:
+		if len(v) > 120 {
+			return v[:120] + "…"
+		}
+		return v
+	default:
+		return v
+	}
+}
+
 func main() {
 	// Create a new router
 	router := mux.NewRouter()
@@ -391,6 +481,8 @@ func main() {
 	api.HandleFunc("/places/autocomplete", placesAutocompleteHandler).Methods("GET")
 	api.HandleFunc("/places/details", placesDetailsHandler).Methods("GET")
 	api.HandleFunc("/plan", planHandler).Methods("POST")
+	api.HandleFunc("/airbnb/parse", airbnbParseHandler).Methods("POST")
+	api.HandleFunc("/airbnb/debug", airbnbDebugHandler).Methods("POST")
 
 	// Server configuration
 	port := "8080"
