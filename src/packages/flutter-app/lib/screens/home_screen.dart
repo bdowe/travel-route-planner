@@ -7,6 +7,7 @@ import 'country_optimizer_screen.dart';
 import 'agent_screen.dart';
 import 'airbnb_parser_screen.dart';
 import 'trips_list_screen.dart';
+import 'preferences_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,10 @@ class HomeScreen extends ConsumerWidget {
             onSelected: (value) {
               if (value == 'logout') {
                 ref.read(authProvider.notifier).logout();
+              } else if (value == 'preferences') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PreferencesScreen()),
+                );
               }
             },
             itemBuilder: (context) => [
@@ -44,6 +49,16 @@ class HomeScreen extends ConsumerWidget {
                   child: Text(user.displayName,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
+              const PopupMenuItem<String>(
+                value: 'preferences',
+                child: Row(
+                  children: [
+                    Icon(Icons.tune, size: 20),
+                    SizedBox(width: 8),
+                    Text('Travel profile'),
+                  ],
+                ),
+              ),
               const PopupMenuItem<String>(
                 value: 'logout',
                 child: Row(
