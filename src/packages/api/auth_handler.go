@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"travel-route-planner/store"
@@ -81,6 +82,24 @@ func bearerToken(r *http.Request) string {
 func userFromContext(ctx context.Context) (store.User, bool) {
 	u, ok := ctx.Value(userContextKey).(store.User)
 	return u, ok
+}
+
+// userIDFromRequest resolves the bearer token to a user ID without failing the
+// request when absent/invalid. Used by endpoints that are open to anonymous
+// callers but persist data only when signed in (e.g. /plan).
+func userIDFromRequest(r *http.Request) (uuid.UUID, bool) {
+	if dbPool == nil {
+		return uuid.UUID{}, false
+	}
+	token := bearerToken(r)
+	if token == "" {
+		return uuid.UUID{}, false
+	}
+	row, err := store.New(dbPool).GetSessionWithUser(r.Context(), token)
+	if err != nil || row.Session.ExpiresAt.Before(time.Now()) {
+		return uuid.UUID{}, false
+	}
+	return row.User.ID, true
 }
 
 // authMiddleware resolves the bearer token to a user and rejects unauthenticated

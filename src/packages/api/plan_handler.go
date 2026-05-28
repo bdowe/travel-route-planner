@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -179,7 +180,18 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 					Summary   string           `json:"summary"`
 				}
 				json.Unmarshal(variant.Input, &in)
-				sendSSE(w, "done", map[string]any{"locations": in.Locations, "summary": in.Summary})
+
+				donePayload := map[string]any{"locations": in.Locations, "summary": in.Summary}
+				// Persist the trip only for signed-in callers; anonymous sessions
+				// stay ephemeral (no trip_id in the done event).
+				if uid, ok := userIDFromRequest(r); ok {
+					if tripID, err := persistTrip(r.Context(), uid, in.Summary, in.Locations); err != nil {
+						log.Printf("failed to persist trip: %v", err)
+					} else {
+						donePayload["trip_id"] = tripID
+					}
+				}
+				sendSSE(w, "done", donePayload)
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, "Itinerary created successfully.", false))
 			}
 		}

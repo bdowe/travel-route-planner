@@ -8,7 +8,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type ItineraryItem struct {
+	ID        uuid.UUID `json:"id"`
+	TripID    uuid.UUID `json:"trip_id"`
+	Position  int32     `json:"position"`
+	Name      string    `json:"name"`
+	PlaceID   *string   `json:"place_id"`
+	Address   *string   `json:"address"`
+	Latitude  float64   `json:"latitude"`
+	Longitude float64   `json:"longitude"`
+	CreatedAt time.Time `json:"created_at"`
+}
 
 type Session struct {
 	ID        string    `json:"id"`
@@ -18,10 +31,14 @@ type Session struct {
 }
 
 type Trip struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    uuid.UUID `json:"user_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        uuid.UUID   `json:"id"`
+	UserID    uuid.UUID   `json:"user_id"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	Title     string      `json:"title"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+	Status    string      `json:"status"`
 }
 
 type User struct {

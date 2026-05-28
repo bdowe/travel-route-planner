@@ -541,6 +541,10 @@ func main() {
 	api.HandleFunc("/auth/login", loginHandler).Methods("POST")
 	api.Handle("/auth/logout", authMiddleware(http.HandlerFunc(logoutHandler))).Methods("POST")
 	api.Handle("/auth/me", authMiddleware(http.HandlerFunc(meHandler))).Methods("GET")
+	api.Handle("/trips", authMiddleware(http.HandlerFunc(listTripsHandler))).Methods("GET")
+	api.Handle("/trips/{id}", authMiddleware(http.HandlerFunc(getTripHandler))).Methods("GET")
+	api.Handle("/trips/{id}", authMiddleware(http.HandlerFunc(patchTripHandler))).Methods("PATCH")
+	api.Handle("/trips/{id}", authMiddleware(http.HandlerFunc(deleteTripHandler))).Methods("DELETE")
 
 	// Server configuration
 	port := "8080"
@@ -568,6 +572,8 @@ func main() {
 	log.Printf("  POST /api/v1/auth/login         - Login")
 	log.Printf("  POST /api/v1/auth/logout        - Logout (auth)")
 	log.Printf("  GET  /api/v1/auth/me            - Current user (auth)")
+	log.Printf("  GET  /api/v1/trips              - List trips (auth)")
+	log.Printf("  GET/PATCH/DELETE /api/v1/trips/{id} - Trip detail (auth)")
 
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatal("Server failed to start:", err)
