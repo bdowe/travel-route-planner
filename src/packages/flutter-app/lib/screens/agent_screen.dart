@@ -4,6 +4,7 @@ import '../models/plan_message.dart';
 import '../providers/plan_provider.dart';
 import '../providers/route_provider.dart';
 import 'route_optimizer_screen.dart';
+import 'trip_detail_screen.dart';
 
 class AgentScreen extends ConsumerStatefulWidget {
   final String? initialMessage;
@@ -134,6 +135,13 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                           summary: planState.completedSummary,
                           locationCount: planState.completedLocations!.length,
                           onLoad: _loadIntoPlanner,
+                          onViewTrip: planState.savedTripId == null
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => TripDetailScreen(tripId: planState.savedTripId!),
+                                    ),
+                                  ),
                         ),
                       if (planState.error != null)
                         Container(
@@ -299,11 +307,13 @@ class _ItineraryBanner extends StatelessWidget {
   final String? summary;
   final int locationCount;
   final VoidCallback onLoad;
+  final VoidCallback? onViewTrip;
 
   const _ItineraryBanner({
     this.summary,
     required this.locationCount,
     required this.onLoad,
+    this.onViewTrip,
   });
 
   @override
@@ -354,6 +364,17 @@ class _ItineraryBanner extends StatelessWidget {
               ),
             ),
           ),
+          if (onViewTrip != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onViewTrip,
+                icon: const Icon(Icons.luggage),
+                label: const Text('View saved trip'),
+              ),
+            ),
+          ],
         ],
       ),
     );

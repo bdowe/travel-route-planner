@@ -14,9 +14,15 @@ class PlanService {
 
   PlanService(this.baseUrl);
 
-  Stream<PlanEvent> streamPlan(List<Map<String, String>> messages) async* {
+  Stream<PlanEvent> streamPlan(
+    List<Map<String, String>> messages, {
+    String? bearerToken,
+  }) async* {
     final request = http.Request('POST', Uri.parse('$baseUrl/plan'));
     request.headers['Content-Type'] = 'application/json';
+    if (bearerToken != null) {
+      request.headers['Authorization'] = 'Bearer $bearerToken';
+    }
     request.body = jsonEncode({'messages': messages});
 
     final response = await request.send();

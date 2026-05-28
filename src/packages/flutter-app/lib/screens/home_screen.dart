@@ -6,6 +6,7 @@ import 'route_optimizer_screen.dart';
 import 'country_optimizer_screen.dart';
 import 'agent_screen.dart';
 import 'airbnb_parser_screen.dart';
+import 'trips_list_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -88,6 +89,19 @@ class HomeScreen extends ConsumerWidget {
               ),
 
               const SizedBox(height: 16),
+
+              // My Trips
+              _ToolRow(
+                icon: Icons.luggage,
+                color: theme.colorScheme.primary,
+                title: 'My Trips',
+                description: 'View and manage trips saved from the AI agent',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TripsListScreen()),
+                ),
+              ),
+
+              const SizedBox(height: 12),
 
               // Route Optimizer
               _ToolRow(

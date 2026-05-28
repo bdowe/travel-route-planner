@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/plan_message.dart';
 import '../models/location.dart';
+import '../services/api_client.dart';
 import '../services/plan_service.dart';
 import 'api_client_provider.dart';
 
@@ -11,6 +12,7 @@ class PlanState {
   final List<String> activeTools;
   final List<Map<String, dynamic>>? completedLocations;
   final String? completedSummary;
+  final String? savedTripId;
   final String? error;
 
   const PlanState({
@@ -20,6 +22,7 @@ class PlanState {
     this.activeTools = const [],
     this.completedLocations,
     this.completedSummary,
+    this.savedTripId,
     this.error,
   });
 
@@ -30,6 +33,7 @@ class PlanState {
     List<String>? activeTools,
     Object? completedLocations = _sentinel,
     Object? completedSummary = _sentinel,
+    Object? savedTripId = _sentinel,
     Object? error = _sentinel,
   }) {
     return PlanState(
@@ -41,6 +45,7 @@ class PlanState {
           ? this.completedLocations
           : completedLocations as List<Map<String, dynamic>>?,
       completedSummary: completedSummary == _sentinel ? this.completedSummary : completedSummary as String?,
+      savedTripId: savedTripId == _sentinel ? this.savedTripId : savedTripId as String?,
       error: error == _sentinel ? this.error : error as String?,
     );
   }
@@ -50,8 +55,9 @@ const _sentinel = Object();
 
 class PlanNotifier extends StateNotifier<PlanState> {
   final PlanService _service;
+  final ApiClient _apiClient;
 
-  PlanNotifier(this._service) : super(const PlanState());
+  PlanNotifier(this._service, this._apiClient) : super(const PlanState());
 
   List<Location> get completedAsLocations {
     final locs = state.completedLocations;
@@ -94,7 +100,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
     final textBuffer = StringBuffer();
 
     try {
-      await for (final event in _service.streamPlan(history)) {
+      await for (final event in _service.streamPlan(history, bearerToken: _apiClient.authToken)) {
         switch (event.type) {
           case 'text_delta':
             textBuffer.write(event.data['text'] as String? ?? '');
@@ -116,6 +122,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
             state = state.copyWith(
               completedLocations: locations,
               completedSummary: summary,
+              savedTripId: event.data['trip_id'] as String?,
             );
 
           case 'error':
@@ -159,6 +166,6 @@ class PlanNotifier extends StateNotifier<PlanState> {
 }
 
 final planProvider = StateNotifierProvider<PlanNotifier, PlanState>((ref) {
-  final baseUrl = ref.watch(apiClientProvider).baseUrl;
-  return PlanNotifier(PlanService(baseUrl));
+  final apiClient = ref.watch(apiClientProvider);
+  return PlanNotifier(PlanService(apiClient.baseUrl), apiClient);
 });
