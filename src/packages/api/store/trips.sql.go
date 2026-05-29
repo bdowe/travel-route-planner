@@ -13,9 +13,9 @@ import (
 )
 
 const createItineraryItem = `-- name: CreateItineraryItem :one
-INSERT INTO itinerary_items (trip_id, position, name, place_id, address, latitude, longitude)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, trip_id, position, name, place_id, address, latitude, longitude, created_at
+INSERT INTO itinerary_items (trip_id, position, name, place_id, address, latitude, longitude, category)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, trip_id, position, name, place_id, address, latitude, longitude, created_at, category
 `
 
 type CreateItineraryItemParams struct {
@@ -26,6 +26,7 @@ type CreateItineraryItemParams struct {
 	Address   *string   `json:"address"`
 	Latitude  float64   `json:"latitude"`
 	Longitude float64   `json:"longitude"`
+	Category  *string   `json:"category"`
 }
 
 func (q *Queries) CreateItineraryItem(ctx context.Context, arg CreateItineraryItemParams) (ItineraryItem, error) {
@@ -37,6 +38,7 @@ func (q *Queries) CreateItineraryItem(ctx context.Context, arg CreateItineraryIt
 		arg.Address,
 		arg.Latitude,
 		arg.Longitude,
+		arg.Category,
 	)
 	var i ItineraryItem
 	err := row.Scan(
@@ -49,6 +51,7 @@ func (q *Queries) CreateItineraryItem(ctx context.Context, arg CreateItineraryIt
 		&i.Latitude,
 		&i.Longitude,
 		&i.CreatedAt,
+		&i.Category,
 	)
 	return i, err
 }
@@ -99,7 +102,7 @@ func (q *Queries) DeleteTrip(ctx context.Context, arg DeleteTripParams) (int64, 
 }
 
 const getItineraryItemsByTrip = `-- name: GetItineraryItemsByTrip :many
-SELECT id, trip_id, position, name, place_id, address, latitude, longitude, created_at FROM itinerary_items WHERE trip_id = $1 ORDER BY position ASC
+SELECT id, trip_id, position, name, place_id, address, latitude, longitude, created_at, category FROM itinerary_items WHERE trip_id = $1 ORDER BY position ASC
 `
 
 func (q *Queries) GetItineraryItemsByTrip(ctx context.Context, tripID uuid.UUID) ([]ItineraryItem, error) {
@@ -121,6 +124,7 @@ func (q *Queries) GetItineraryItemsByTrip(ctx context.Context, tripID uuid.UUID)
 			&i.Latitude,
 			&i.Longitude,
 			&i.CreatedAt,
+			&i.Category,
 		); err != nil {
 			return nil, err
 		}

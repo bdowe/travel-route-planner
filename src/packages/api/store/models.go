@@ -37,6 +37,7 @@ type ItineraryItem struct {
 	Latitude  float64   `json:"latitude"`
 	Longitude float64   `json:"longitude"`
 	CreatedAt time.Time `json:"created_at"`
+	Category  *string   `json:"category"`
 }
 
 type Session struct {

@@ -28,7 +28,10 @@ type ItineraryItemResponse struct {
 	Address   *string `json:"address,omitempty"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
+	Category  *string `json:"category,omitempty"`
 }
+
+var allowedItemCategories = map[string]bool{"attraction": true, "restaurant": true}
 
 type TripResponse struct {
 	ID             string                  `json:"id"`
@@ -80,6 +83,7 @@ func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []
 			Address:   it.Address,
 			Latitude:  it.Latitude,
 			Longitude: it.Longitude,
+			Category:  it.Category,
 		})
 	}
 	for _, a := range accommodations {
@@ -119,12 +123,18 @@ func persistTrip(ctx context.Context, userID uuid.UUID, summary string, location
 		name, _ := loc["name"].(string)
 		lat, _ := loc["latitude"].(float64)
 		lng, _ := loc["longitude"].(float64)
-		var placeID, address *string
+		var placeID, address, category *string
 		if s, ok := loc["place_id"].(string); ok && s != "" {
 			placeID = &s
 		}
 		if s, ok := loc["address"].(string); ok && s != "" {
 			address = &s
+		}
+		if s, ok := loc["category"].(string); ok {
+			c := strings.ToLower(strings.TrimSpace(s))
+			if allowedItemCategories[c] {
+				category = &c
+			}
 		}
 		if _, err := q.CreateItineraryItem(ctx, store.CreateItineraryItemParams{
 			TripID:    trip.ID,
@@ -134,6 +144,7 @@ func persistTrip(ctx context.Context, userID uuid.UUID, summary string, location
 			Address:   address,
 			Latitude:  lat,
 			Longitude: lng,
+			Category:  category,
 		}); err != nil {
 			return "", err
 		}

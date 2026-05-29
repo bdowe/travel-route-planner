@@ -4,8 +4,8 @@ VALUES ($1, $2, $3)
 RETURNING *;
 
 -- name: CreateItineraryItem :one
-INSERT INTO itinerary_items (trip_id, position, name, place_id, address, latitude, longitude)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO itinerary_items (trip_id, position, name, place_id, address, latitude, longitude, category)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: ListTripsByOwner :many
