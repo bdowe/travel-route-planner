@@ -20,6 +20,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   Trip? _trip;
   bool _loading = true;
   String? _error;
+  String _itemFilter = 'all'; // 'all' | 'attraction' | 'restaurant'
 
   @override
   void initState() {
@@ -126,6 +127,17 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   String _fmt(DateTime d) =>
       '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+  Widget _itemLeading(String? category, int position) {
+    switch (category) {
+      case 'restaurant':
+        return const CircleAvatar(child: Icon(Icons.restaurant, size: 18));
+      case 'attraction':
+        return const CircleAvatar(child: Icon(Icons.attractions, size: 18));
+      default:
+        return CircleAvatar(child: Text('${position + 1}'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -204,18 +216,49 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                         const Divider(height: 32),
                         Text('Itinerary', style: theme.textTheme.titleMedium),
                         const SizedBox(height: 8),
+                        if ((trip.items ?? []).isNotEmpty)
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              for (final f in const [
+                                ('all', 'All'),
+                                ('attraction', 'Attractions'),
+                                ('restaurant', 'Restaurants'),
+                              ])
+                                ChoiceChip(
+                                  label: Text(f.$2),
+                                  selected: _itemFilter == f.$1,
+                                  onSelected: (_) => setState(() => _itemFilter = f.$1),
+                                ),
+                            ],
+                          ),
                         if ((trip.items ?? []).isEmpty)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Text('No places added.'),
                           )
                         else
-                          for (final item in trip.items!)
-                            ListTile(
-                              leading: CircleAvatar(child: Text('${item.position + 1}')),
-                              title: Text(item.name),
-                              subtitle: item.address != null ? Text(item.address!) : null,
-                            ),
+                          Builder(builder: (_) {
+                            final filtered = _itemFilter == 'all'
+                                ? trip.items!
+                                : trip.items!.where((i) => i.category == _itemFilter).toList();
+                            if (filtered.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 16),
+                                child: Text('No items match this filter.'),
+                              );
+                            }
+                            return Column(
+                              children: [
+                                for (final item in filtered)
+                                  ListTile(
+                                    leading: _itemLeading(item.category, item.position),
+                                    title: Text(item.name),
+                                    subtitle: item.address != null ? Text(item.address!) : null,
+                                  ),
+                              ],
+                            );
+                          }),
                         const Divider(height: 32),
                         Row(
                           children: [

@@ -12,6 +12,7 @@ class ItineraryItem {
   final String? address;
   final double latitude;
   final double longitude;
+  final String? category;
 
   const ItineraryItem({
     required this.id,
@@ -21,6 +22,7 @@ class ItineraryItem {
     this.address,
     required this.latitude,
     required this.longitude,
+    this.category,
   });
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) =>

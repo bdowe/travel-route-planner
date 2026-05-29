@@ -15,6 +15,7 @@ ItineraryItem _$ItineraryItemFromJson(Map<String, dynamic> json) =>
       address: json['address'] as String?,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
+      category: json['category'] as String?,
     );
 
 Map<String, dynamic> _$ItineraryItemToJson(ItineraryItem instance) =>
@@ -26,4 +27,5 @@ Map<String, dynamic> _$ItineraryItemToJson(ItineraryItem instance) =>
       'address': instance.address,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
+      'category': instance.category,
     };
