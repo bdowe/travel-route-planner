@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../providers/preferences_provider.dart';
 
 const _budgets = ['budget', 'mid', 'luxury'];
@@ -76,10 +77,8 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
     final chipLabels = {..._suggestedInterests, ..._interests}.toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Travel profile'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+      appBar: const GradientAppBar(
+        title: Text('Travel profile'),
       ),
       body: state.loading && !_initialized
           ? const Center(child: CircularProgressIndicator())

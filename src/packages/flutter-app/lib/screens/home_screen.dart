@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/gradient_app_bar.dart';
 import 'route_optimizer_screen.dart';
 import 'country_optimizer_screen.dart';
 import 'agent_screen.dart';
@@ -26,19 +27,8 @@ class HomeScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).user;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('Travel Route Planner'),
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.teal.shade600, Colors.teal.shade900],
-            ),
-          ),
-        ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../models/trip.dart';
 import '../models/trip_segment.dart';
 import '../models/airbnb_listing.dart';
@@ -147,10 +148,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     final trip = _trip;
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('Trip'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           if (trip != null)
             IconButton(

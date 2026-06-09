@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../providers/trips_provider.dart';
 import 'trip_detail_screen.dart';
 
@@ -88,10 +89,8 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Trips'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+      appBar: const GradientAppBar(
+        title: Text('My Trips'),
       ),
       body: body,
     );

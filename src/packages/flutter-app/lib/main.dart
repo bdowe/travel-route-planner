@@ -22,7 +22,7 @@ class TravelRoutePlannerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32), // Green theme
+          seedColor: Colors.teal.shade700, // Teal theme (matches the home banner)
           brightness: Brightness.light,
         ),
         useMaterial3: true,

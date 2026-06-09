@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../models/plan_message.dart';
 import '../providers/plan_provider.dart';
 import '../providers/route_provider.dart';
@@ -81,10 +82,8 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('AI Travel Agent'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           if (planState.messages.isNotEmpty || planState.completedLocations != null)
             IconButton(

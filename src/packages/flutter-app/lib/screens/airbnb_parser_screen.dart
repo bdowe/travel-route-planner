@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../models/airbnb_listing.dart';
 import '../providers/airbnb_provider.dart';
 
@@ -33,13 +34,10 @@ class _AirbnbParserScreenState extends ConsumerState<AirbnbParserScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(airbnbParserProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('Airbnb Parser'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
         actions: [
           if (state.listing != null)
             IconButton(

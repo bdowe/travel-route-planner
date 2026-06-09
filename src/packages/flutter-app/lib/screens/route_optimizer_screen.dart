@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../models/location.dart';
 import '../providers/route_provider.dart';
 import '../widgets/location_input_dialog.dart';
@@ -16,10 +17,8 @@ class RouteOptimizerScreen extends ConsumerWidget {
     final routeNotifier = ref.read(routeProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('Route Optimizer'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         actions: [
           if (routeState.locations.isNotEmpty)
             IconButton(

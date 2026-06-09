@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import '../widgets/gradient_app_bar.dart';
 import '../models/country.dart';
 import '../providers/country_provider.dart';
 import '../widgets/country_input_dialog.dart';
@@ -16,10 +17,8 @@ class CountryOptimizerScreen extends ConsumerWidget {
     final countryNotifier = ref.read(countryProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: GradientAppBar(
         title: const Text('Country Planner'),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-        foregroundColor: Theme.of(context).colorScheme.onSecondary,
         actions: [
           if (countryState.countries.isNotEmpty)
             IconButton(
