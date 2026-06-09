@@ -28,8 +28,17 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Travel Route Planner'),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.teal.shade600, Colors.teal.shade900],
+            ),
+          ),
+        ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle),
@@ -108,7 +117,7 @@ class HomeScreen extends ConsumerWidget {
               // My Trips
               _ToolRow(
                 icon: Icons.luggage,
-                color: theme.colorScheme.primary,
+                color: Colors.teal.shade700,
                 title: 'My Trips',
                 description: 'View and manage trips saved from the AI agent',
                 onTap: () => Navigator.of(context).push(
@@ -121,7 +130,7 @@ class HomeScreen extends ConsumerWidget {
               // Route Optimizer
               _ToolRow(
                 icon: MdiIcons.mapMarkerMultiple,
-                color: theme.colorScheme.primary,
+                color: Colors.teal.shade700,
                 title: 'Route Optimizer',
                 description: 'Optimize routes for multiple locations in a city',
                 onTap: () => Navigator.of(context).push(
@@ -134,7 +143,7 @@ class HomeScreen extends ConsumerWidget {
               // Country Planner
               _ToolRow(
                 icon: MdiIcons.earth,
-                color: theme.colorScheme.secondary,
+                color: Colors.teal.shade700,
                 title: 'Country Planner',
                 description: 'Plan multi-country trips with seasonal optimization',
                 onTap: () => Navigator.of(context).push(
@@ -147,7 +156,7 @@ class HomeScreen extends ConsumerWidget {
               // Airbnb Parser
               _ToolRow(
                 icon: Icons.home_work_outlined,
-                color: theme.colorScheme.tertiary,
+                color: Colors.teal.shade700,
                 title: 'Airbnb Parser',
                 description: 'Extract photos, pricing, and details from any Airbnb link',
                 onTap: () => Navigator.of(context).push(
