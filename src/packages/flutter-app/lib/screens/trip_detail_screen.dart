@@ -203,10 +203,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   }
 
   /// Groups items into consecutive runs sharing the same locality, labelling
-  /// each run with a date range derived from a matching accommodation.
+  /// each run with the date range precomputed for that location (keyed by the
+  /// first item's position).
   List<({String label, String? dateRange, List<ItineraryItem> items})> _buildGroups(
     List<ItineraryItem> items,
-    List<Accommodation> stays,
+    Map<int, String> locationDates,
   ) {
     final groups = <({String label, String? dateRange, List<ItineraryItem> items})>[];
     String? currentKey;
@@ -218,7 +219,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         currentKey = locality;
         groups.add((
           label: locality ?? 'Other places',
-          dateRange: _dateRangeFor(locality, stays),
+          dateRange: locationDates[item.position],
           items: current,
         ));
       }
@@ -226,6 +227,96 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     }
     return groups;
   }
+
+  /// Maps each itinerary item's position to its location's date range. Each
+  /// location gets a contiguous slice of the trip's start–end span, weighted by
+  /// how many places it has; an accommodation with its own dates overrides the
+  /// computed slice. Empty when no dates can be derived. Computed over the full
+  /// itinerary so the category filter doesn't shift the allocation.
+  Map<int, String> _locationDates(Trip trip) {
+    final items = trip.items ?? const <ItineraryItem>[];
+    if (items.isEmpty) return const {};
+    final stays = trip.accommodations ?? const <Accommodation>[];
+
+    // Canonical locality runs over the full itinerary.
+    final groups = <List<ItineraryItem>>[];
+    String? currentKey;
+    for (final item in items) {
+      final locality = _localityOf(item.address);
+      if (groups.isEmpty || locality != currentKey) {
+        groups.add([]);
+        currentKey = locality;
+      }
+      groups.last.add(item);
+    }
+
+    // Auto-split the trip span across groups, weighted by item count.
+    final start = DateTime.tryParse(trip.startDate ?? '');
+    final end = DateTime.tryParse(trip.endDate ?? '');
+    final auto = List<({DateTime start, DateTime end})?>.filled(groups.length, null);
+    if (start != null && end != null && !end.isBefore(start)) {
+      final totalDays = end.difference(start).inDays + 1;
+      final counts = _allocateDays(totalDays, [for (final g in groups) g.length]);
+      var cursor = start;
+      for (var i = 0; i < groups.length; i++) {
+        var rEnd = cursor.add(Duration(days: counts[i] - 1));
+        if (rEnd.isAfter(end)) rEnd = end;
+        auto[i] = (start: cursor, end: rEnd);
+        cursor = rEnd.add(const Duration(days: 1));
+      }
+    }
+
+    final result = <int, String>{};
+    for (var i = 0; i < groups.length; i++) {
+      final g = groups[i];
+      final accRange = _dateRangeFor(_localityOf(g.first.address), stays);
+      final a = auto[i];
+      final range = accRange ?? (a == null ? null : _formatRange(a.start, a.end));
+      if (range != null) {
+        for (final it in g) {
+          result[it.position] = range;
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Splits [totalDays] across groups proportional to [weights], each group at
+  /// least 1 day, summing to totalDays (largest-remainder; trims overflow from
+  /// the largest groups when the min-1 floor pushes the total over).
+  List<int> _allocateDays(int totalDays, List<int> weights) {
+    final n = weights.length;
+    if (n == 0) return const [];
+    if (totalDays <= n) return List.filled(n, 1); // ranges clamp to the trip end
+    final totalW = weights.fold<int>(0, (s, w) => s + (w <= 0 ? 1 : w));
+    final exact = [for (final w in weights) totalDays * (w <= 0 ? 1 : w) / totalW];
+    final counts = [for (final e in exact) e.floor() < 1 ? 1 : e.floor()];
+    var used = counts.fold<int>(0, (s, c) => s + c);
+    // Hand out any remaining days to the largest fractional remainders.
+    final byRemainder = List<int>.generate(n, (i) => i)
+      ..sort((a, b) => (exact[b] - exact[b].floor()).compareTo(exact[a] - exact[a].floor()));
+    for (var k = 0; used < totalDays; k++) {
+      counts[byRemainder[k % n]] += 1;
+      used++;
+    }
+    // Or trim back from the largest groups if min-1 overshot.
+    final byCount = List<int>.generate(n, (i) => i)..sort((a, b) => counts[b].compareTo(counts[a]));
+    for (var k = 0; used > totalDays; k++) {
+      final j = byCount[k % n];
+      if (counts[j] > 1) {
+        counts[j]--;
+        used--;
+      }
+    }
+    return counts;
+  }
+
+  String _formatRange(DateTime a, DateTime b) {
+    final sameDay = a.year == b.year && a.month == b.month && a.day == b.day;
+    return sameDay ? _fmtShortDt(a) : '${_fmtShortDt(a)} – ${_fmtShortDt(b)}';
+  }
+
+  String _fmtShortDt(DateTime d) => '${_months[d.month - 1]} ${d.day}';
 
   /// Finds the first accommodation in [locality] with both check-in/out dates
   /// and formats them as a short range; null when nothing matches.
@@ -254,7 +345,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   String _fmtShort(String iso) {
     final d = DateTime.tryParse(iso);
     if (d == null) return iso;
-    return '${_months[d.month - 1]} ${d.day}';
+    return _fmtShortDt(d);
   }
 
   @override
@@ -396,8 +487,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                 child: Text('No items match this filter.'),
                               );
                             }
-                            final groups =
-                                _buildGroups(filtered, trip.accommodations ?? const []);
+                            final groups = _buildGroups(filtered, _locationDates(trip));
                             return Column(
                               children: [
                                 for (final group in groups) ...[
