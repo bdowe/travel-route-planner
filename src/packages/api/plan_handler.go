@@ -92,6 +92,11 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 								"enum":        []string{"attraction", "restaurant"},
 								"description": "What kind of place this is — 'attraction' for sights/activities, 'restaurant' for places to eat.",
 							},
+							"time_of_day": map[string]any{
+								"type":        "string",
+								"enum":        []string{"morning", "afternoon", "evening"},
+								"description": "Which part of the day to do this — spread a day's places sensibly (sights/activities across morning–afternoon, meals at their natural times).",
+							},
 						},
 						"required": []string{"name", "latitude", "longitude"},
 					},
@@ -177,7 +182,7 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	basePrompt := "You are an expert travel agent. Help users plan trips by searching for specific places and attractions. Use search_places to find real locations with coordinates. Search for individual places (e.g. 'Louvre Museum Paris') rather than broad queries. Include a mix of activities/attractions and dining (restaurants), guided by the traveler's interests, budget, and pace. When you call create_itinerary, tag each location with category ('attraction' or 'restaurant') so the app can surface the right context. When you have gathered enough places for the user's trip, call create_itinerary to finalize the plan. Be conversational and helpful — ask clarifying questions if needed before searching."
+	basePrompt := "You are an expert travel agent. Help users plan trips by searching for specific places and attractions. Use search_places to find real locations with coordinates. Search for individual places (e.g. 'Louvre Museum Paris') rather than broad queries. Include a mix of activities/attractions and dining (restaurants), guided by the traveler's interests, budget, and pace. When you call create_itinerary, tag each location with category ('attraction' or 'restaurant') and a time_of_day ('morning', 'afternoon', or 'evening') so each day reads as a sensible schedule. When you have gathered enough places for the user's trip, call create_itinerary to finalize the plan. Be conversational and helpful — ask clarifying questions if needed before searching."
 
 	placesService := NewGooglePlacesService()
 	ctx := r.Context()

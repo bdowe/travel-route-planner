@@ -13,6 +13,8 @@ class ItineraryItem {
   final double latitude;
   final double longitude;
   final String? category;
+  @JsonKey(name: 'time_of_day')
+  final String? timeOfDay;
 
   const ItineraryItem({
     required this.id,
@@ -23,6 +25,7 @@ class ItineraryItem {
     required this.latitude,
     required this.longitude,
     this.category,
+    this.timeOfDay,
   });
 
   factory ItineraryItem.fromJson(Map<String, dynamic> json) =>

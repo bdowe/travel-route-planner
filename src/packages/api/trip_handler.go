@@ -29,9 +29,12 @@ type ItineraryItemResponse struct {
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
 	Category  *string `json:"category,omitempty"`
+	TimeOfDay *string `json:"time_of_day,omitempty"`
 }
 
 var allowedItemCategories = map[string]bool{"attraction": true, "restaurant": true}
+
+var allowedTimesOfDay = map[string]bool{"morning": true, "afternoon": true, "evening": true}
 
 type TripResponse struct {
 	ID             string                  `json:"id"`
@@ -88,6 +91,7 @@ func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []
 			Latitude:  it.Latitude,
 			Longitude: it.Longitude,
 			Category:  it.Category,
+			TimeOfDay: it.TimeOfDay,
 		})
 	}
 	for _, a := range accommodations {
@@ -136,7 +140,7 @@ func persistTrip(ctx context.Context, userID uuid.UUID, chatID, summary string, 
 		name, _ := loc["name"].(string)
 		lat, _ := loc["latitude"].(float64)
 		lng, _ := loc["longitude"].(float64)
-		var placeID, address, category *string
+		var placeID, address, category, timeOfDay *string
 		if s, ok := loc["place_id"].(string); ok && s != "" {
 			placeID = &s
 		}
@@ -149,6 +153,12 @@ func persistTrip(ctx context.Context, userID uuid.UUID, chatID, summary string, 
 				category = &c
 			}
 		}
+		if s, ok := loc["time_of_day"].(string); ok {
+			t := strings.ToLower(strings.TrimSpace(s))
+			if allowedTimesOfDay[t] {
+				timeOfDay = &t
+			}
+		}
 		if _, err := q.CreateItineraryItem(ctx, store.CreateItineraryItemParams{
 			TripID:    trip.ID,
 			Position:  int32(i),
@@ -158,6 +168,7 @@ func persistTrip(ctx context.Context, userID uuid.UUID, chatID, summary string, 
 			Latitude:  lat,
 			Longitude: lng,
 			Category:  category,
+			TimeOfDay: timeOfDay,
 		}); err != nil {
 			return "", err
 		}

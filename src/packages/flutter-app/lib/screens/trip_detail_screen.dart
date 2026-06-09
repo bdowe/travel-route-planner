@@ -536,6 +536,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                       title: Text(item.name),
                                       subtitle:
                                           item.address != null ? Text(item.address!) : null,
+                                      trailing: item.timeOfDay == null
+                                          ? null
+                                          : _TimeOfDayChip(timeOfDay: item.timeOfDay!),
                                       selected: _selectedPosition == item.position,
                                       selectedTileColor:
                                           theme.colorScheme.primary.withValues(alpha: 0.08),
@@ -1177,6 +1180,45 @@ class _AddSegmentDialogState extends ConsumerState<_AddSegmentDialog> {
               : const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+/// Small pill showing a place's part of day (Morning/Afternoon/Evening), tinted
+/// by time so a day's rhythm is scannable at a glance.
+class _TimeOfDayChip extends StatelessWidget {
+  final String timeOfDay;
+  const _TimeOfDayChip({required this.timeOfDay});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon) = switch (timeOfDay) {
+      'morning' => ('Morning', Icons.wb_twilight),
+      'afternoon' => ('Afternoon', Icons.wb_sunny_outlined),
+      'evening' => ('Evening', Icons.nightlight_outlined),
+      _ => (timeOfDay, Icons.schedule),
+    };
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: scheme.onSecondaryContainer),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: scheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
