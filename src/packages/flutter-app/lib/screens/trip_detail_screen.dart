@@ -4,6 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../models/trip.dart';
 import '../models/trip_segment.dart';
+import '../models/itinerary_item.dart';
+import '../models/accommodation.dart';
 import '../models/airbnb_listing.dart';
 import '../providers/trips_provider.dart';
 import '../providers/accommodations_provider.dart';
@@ -183,6 +185,69 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     }
   }
 
+  /// The first comma-segment of an address (e.g. "Green Turtle Cay, Abaco,
+  /// Bahamas" -> "Green Turtle Cay"); null/empty addresses return null.
+  String? _localityOf(String? address) {
+    if (address == null) return null;
+    final first = address.split(',').first.trim();
+    return first.isEmpty ? null : first;
+  }
+
+  /// Groups items into consecutive runs sharing the same locality, labelling
+  /// each run with a date range derived from a matching accommodation.
+  List<({String label, String? dateRange, List<ItineraryItem> items})> _buildGroups(
+    List<ItineraryItem> items,
+    List<Accommodation> stays,
+  ) {
+    final groups = <({String label, String? dateRange, List<ItineraryItem> items})>[];
+    String? currentKey;
+    List<ItineraryItem>? current;
+    for (final item in items) {
+      final locality = _localityOf(item.address);
+      if (current == null || locality != currentKey) {
+        current = [];
+        currentKey = locality;
+        groups.add((
+          label: locality ?? 'Other places',
+          dateRange: _dateRangeFor(locality, stays),
+          items: current,
+        ));
+      }
+      current.add(item);
+    }
+    return groups;
+  }
+
+  /// Finds the first accommodation in [locality] with both check-in/out dates
+  /// and formats them as a short range; null when nothing matches.
+  String? _dateRangeFor(String? locality, List<Accommodation> stays) {
+    if (locality == null) return null;
+    final key = locality.toLowerCase();
+    for (final acc in stays) {
+      final addr = acc.address?.toLowerCase();
+      if (addr == null) continue;
+      if ((addr.contains(key) || key.contains(addr)) &&
+          acc.checkIn != null &&
+          acc.checkOut != null) {
+        return '${_fmtShort(acc.checkIn!)} – ${_fmtShort(acc.checkOut!)}';
+      }
+    }
+    return null;
+  }
+
+  static const _months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// Formats a "YYYY-MM-DD" date as e.g. "Jun 10"; returns the raw string if it
+  /// cannot be parsed.
+  String _fmtShort(String iso) {
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso;
+    return '${_months[d.month - 1]} ${d.day}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -323,19 +388,51 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                 child: Text('No items match this filter.'),
                               );
                             }
+                            final groups =
+                                _buildGroups(filtered, trip.accommodations ?? const []);
                             return Column(
                               children: [
-                                for (final item in filtered)
-                                  ListTile(
-                                    leading: _itemLeading(item.category, item.position),
-                                    title: Text(item.name),
-                                    subtitle: item.address != null ? Text(item.address!) : null,
-                                    selected: _selectedItem == trip.items!.indexOf(item),
-                                    selectedTileColor:
-                                        theme.colorScheme.primary.withValues(alpha: 0.08),
-                                    onTap: () => setState(
-                                        () => _selectedItem = trip.items!.indexOf(item)),
+                                for (final group in groups) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            group.label,
+                                            style: theme.textTheme.titleSmall
+                                                ?.copyWith(fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                        if (group.dateRange != null)
+                                          Row(
+                                            children: [
+                                              Icon(Icons.event,
+                                                  size: 14, color: theme.colorScheme.primary),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                group.dateRange!,
+                                                style: theme.textTheme.labelMedium?.copyWith(
+                                                    color: theme.colorScheme.primary),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
                                   ),
+                                  for (final item in group.items)
+                                    ListTile(
+                                      leading: _itemLeading(item.category, item.position),
+                                      title: Text(item.name),
+                                      subtitle:
+                                          item.address != null ? Text(item.address!) : null,
+                                      selected: _selectedItem == trip.items!.indexOf(item),
+                                      selectedTileColor:
+                                          theme.colorScheme.primary.withValues(alpha: 0.08),
+                                      onTap: () => setState(
+                                          () => _selectedItem = trip.items!.indexOf(item)),
+                                    ),
+                                ],
                               ],
                             );
                           }),
