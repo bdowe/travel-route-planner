@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/itinerary_item.dart';
 
@@ -75,23 +76,63 @@ class TripMap extends StatelessWidget {
               ),
             ],
           ),
-        MarkerLayer(
-          markers: [
-            for (final m in mapped)
-              Marker(
-                point: m.point,
-                width: 32,
-                height: 32,
-                child: _Pin(
-                  label: '${m.item.position + 1}',
-                  category: m.item.category,
-                  selected: selectedIndex == m.index,
-                  onTap: onPinTap == null ? null : () => onPinTap!(m.index),
+        MarkerClusterLayerWidget(
+          options: MarkerClusterLayerOptions(
+            maxClusterRadius: 45,
+            size: const Size(40, 40),
+            padding: const EdgeInsets.all(40),
+            markers: [
+              for (final m in mapped)
+                Marker(
+                  point: m.point,
+                  width: 32,
+                  height: 32,
+                  child: _Pin(
+                    label: '${m.item.position + 1}',
+                    category: m.item.category,
+                    selected: selectedIndex == m.index,
+                    onTap: onPinTap == null ? null : () => onPinTap!(m.index),
+                  ),
                 ),
-              ),
-          ],
+            ],
+            builder: (context, clusterMarkers) =>
+                _ClusterBubble(count: clusterMarkers.length),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _ClusterBubble extends StatelessWidget {
+  final int count;
+  const _ClusterBubble({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.primary,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
