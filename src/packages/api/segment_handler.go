@@ -1,0 +1,150 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+
+	"travel-route-planner/store"
+)
+
+var allowedSegmentModes = map[string]bool{
+	"flight": true, "train": true, "bus": true, "car": true, "ferry": true, "other": true,
+}
+
+type SegmentResponse struct {
+	ID          string  `json:"id"`
+	Mode        string  `json:"mode"`
+	Origin      *string `json:"origin,omitempty"`
+	Destination *string `json:"destination,omitempty"`
+	DepartDate  *string `json:"depart_date,omitempty"`
+	ArriveDate  *string `json:"arrive_date,omitempty"`
+	Provider    *string `json:"provider,omitempty"`
+	URL         *string `json:"url,omitempty"`
+	PriceNote   *string `json:"price_note,omitempty"`
+	Notes       *string `json:"notes,omitempty"`
+}
+
+type AddSegmentRequest struct {
+	Mode        string  `json:"mode"`
+	Origin      *string `json:"origin"`
+	Destination *string `json:"destination"`
+	DepartDate  *string `json:"depart_date"`
+	ArriveDate  *string `json:"arrive_date"`
+	Provider    *string `json:"provider"`
+	URL         *string `json:"url"`
+	PriceNote   *string `json:"price_note"`
+	Notes       *string `json:"notes"`
+}
+
+func toSegmentResponse(s store.TripSegment) SegmentResponse {
+	return SegmentResponse{
+		ID:          s.ID.String(),
+		Mode:        s.Mode,
+		Origin:      s.Origin,
+		Destination: s.Destination,
+		DepartDate:  dateToPtr(s.DepartDate),
+		ArriveDate:  dateToPtr(s.ArriveDate),
+		Provider:    s.Provider,
+		URL:         s.Url,
+		PriceNote:   s.PriceNote,
+		Notes:       s.Notes,
+	}
+}
+
+// transportLinksHandler builds the per-provider browse links. No auth.
+func transportLinksHandler(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	origin := strings.TrimSpace(q.Get("origin"))
+	destination := strings.TrimSpace(q.Get("destination"))
+	if origin == "" || destination == "" {
+		writeJSONError(w, http.StatusBadRequest, "origin and destination are required")
+		return
+	}
+	passengers, _ := strconv.Atoi(q.Get("passengers"))
+	links := transportLinks(TransportQuery{
+		Mode:        strings.TrimSpace(q.Get("mode")),
+		Origin:      origin,
+		Destination: destination,
+		DepartDate:  q.Get("depart_date"),
+		ReturnDate:  q.Get("return_date"),
+		Passengers:  passengers,
+	})
+	writeJSON(w, http.StatusOK, links)
+}
+
+func addSegmentHandler(w http.ResponseWriter, r *http.Request) {
+	tripID, ok := ownedTrip(w, r)
+	if !ok {
+		return
+	}
+	var req AddSegmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if !allowedSegmentModes[mode] {
+		writeJSONError(w, http.StatusBadRequest, "mode must be one of: flight, train, bus, car, ferry, other")
+		return
+	}
+	depart, err := parseDateParam(req.DepartDate)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "depart_date must be YYYY-MM-DD")
+		return
+	}
+	arrive, err := parseDateParam(req.ArriveDate)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "arrive_date must be YYYY-MM-DD")
+		return
+	}
+	if depart.Valid && arrive.Valid && arrive.Time.Before(depart.Time) {
+		writeJSONError(w, http.StatusBadRequest, "arrive_date must not be before depart_date")
+		return
+	}
+
+	seg, err := store.New(dbPool).CreateSegment(r.Context(), store.CreateSegmentParams{
+		TripID:      tripID,
+		Mode:        mode,
+		Origin:      req.Origin,
+		Destination: req.Destination,
+		DepartDate:  depart,
+		ArriveDate:  arrive,
+		Provider:    req.Provider,
+		Url:         req.URL,
+		PriceNote:   req.PriceNote,
+		Notes:       req.Notes,
+	})
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "could not save segment")
+		return
+	}
+	writeJSON(w, http.StatusCreated, toSegmentResponse(seg))
+}
+
+func deleteSegmentHandler(w http.ResponseWriter, r *http.Request) {
+	tripID, ok := ownedTrip(w, r)
+	if !ok {
+		return
+	}
+	segID, err := uuid.Parse(mux.Vars(r)["segmentId"])
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "segment not found")
+		return
+	}
+	rows, err := store.New(dbPool).DeleteSegment(r.Context(),
+		store.DeleteSegmentParams{ID: segID, TripID: tripID})
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "could not delete segment")
+		return
+	}
+	if rows == 0 {
+		writeJSONError(w, http.StatusNotFound, "segment not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -67,6 +67,22 @@ type Trip struct {
 	Status    string      `json:"status"`
 }
 
+type TripSegment struct {
+	ID          uuid.UUID   `json:"id"`
+	TripID      uuid.UUID   `json:"trip_id"`
+	Mode        string      `json:"mode"`
+	Origin      *string     `json:"origin"`
+	Destination *string     `json:"destination"`
+	DepartDate  pgtype.Date `json:"depart_date"`
+	ArriveDate  pgtype.Date `json:"arrive_date"`
+	Provider    *string     `json:"provider"`
+	Url         *string     `json:"url"`
+	PriceNote   *string     `json:"price_note"`
+	Notes       *string     `json:"notes"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	CreatedAt    time.Time `json:"created_at"`

@@ -43,6 +43,7 @@ type TripResponse struct {
 	UpdatedAt      time.Time               `json:"updated_at"`
 	Items          []ItineraryItemResponse `json:"items,omitempty"`
 	Accommodations []AccommodationResponse `json:"accommodations,omitempty"`
+	Segments       []SegmentResponse       `json:"segments,omitempty"`
 }
 
 type PatchTripRequest struct {
@@ -64,7 +65,7 @@ func dateToPtr(d pgtype.Date) *string {
 	return &s
 }
 
-func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []store.Accommodation) TripResponse {
+func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []store.Accommodation, segments []store.TripSegment) TripResponse {
 	resp := TripResponse{
 		ID:        t.ID.String(),
 		Title:     t.Title,
@@ -88,6 +89,9 @@ func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []
 	}
 	for _, a := range accommodations {
 		resp.Accommodations = append(resp.Accommodations, toAccommodationResponse(a))
+	}
+	for _, s := range segments {
+		resp.Segments = append(resp.Segments, toSegmentResponse(s))
 	}
 	return resp
 }
@@ -175,7 +179,7 @@ func listTripsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]TripResponse, 0, len(trips))
 	for _, t := range trips {
-		out = append(out, toTripResponse(t, nil, nil))
+		out = append(out, toTripResponse(t, nil, nil, nil))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -203,7 +207,12 @@ func getTripHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "could not load accommodations")
 		return
 	}
-	writeJSON(w, http.StatusOK, toTripResponse(trip, items, accommodations))
+	segments, err := q.ListSegmentsByTrip(r.Context(), trip.ID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "could not load segments")
+		return
+	}
+	writeJSON(w, http.StatusOK, toTripResponse(trip, items, accommodations, segments))
 }
 
 func patchTripHandler(w http.ResponseWriter, r *http.Request) {
@@ -261,7 +270,7 @@ func patchTripHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusInternalServerError, "could not load itinerary")
 		return
 	}
-	writeJSON(w, http.StatusOK, toTripResponse(trip, items, nil))
+	writeJSON(w, http.StatusOK, toTripResponse(trip, items, nil, nil))
 }
 
 func deleteTripHandler(w http.ResponseWriter, r *http.Request) {

@@ -141,10 +141,27 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	suggestTransportTool := anthropic.ToolParam{
+		Name:        "suggest_transport",
+		Description: anthropic.String("Give the traveler links to browse transport options. Call this when they need to get to or between destinations. Mode 'flight' returns Google Flights + Kayak; mode 'ground' returns Rome2Rio (covers trains, buses, cars, ferries)."),
+		InputSchema: anthropic.ToolInputSchemaParam{
+			Properties: map[string]any{
+				"mode":        map[string]any{"type": "string", "enum": []string{"flight", "ground"}, "description": "flight or ground (multimodal)"},
+				"origin":      map[string]any{"type": "string", "description": "Origin city or airport, e.g. 'NYC' or 'Paris'"},
+				"destination": map[string]any{"type": "string", "description": "Destination city or airport"},
+				"depart_date": map[string]any{"type": "string", "description": "Optional YYYY-MM-DD"},
+				"return_date": map[string]any{"type": "string", "description": "Optional YYYY-MM-DD (flights only)"},
+				"passengers":  map[string]any{"type": "integer", "description": "Optional passenger count"},
+			},
+			Required: []string{"mode", "origin", "destination"},
+		},
+	}
+
 	tools := []anthropic.ToolUnionParam{
 		{OfTool: &searchTool},
 		{OfTool: &createTool},
 		{OfTool: &suggestStaysTool},
+		{OfTool: &suggestTransportTool},
 	}
 	if authed {
 		tools = append(tools, anthropic.ToolUnionParam{OfTool: &savePrefsTool})
@@ -293,6 +310,27 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				})
 				sendSSE(w, "stays", map[string]any{"destination": in.Destination, "links": links})
 				sendSSE(w, "tool_result", map[string]string{"name": "suggest_stays"})
+				b, _ := json.Marshal(links)
+				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, "Provided browse links: "+string(b), false))
+
+			case "suggest_transport":
+				var in struct {
+					Mode        string `json:"mode"`
+					Origin      string `json:"origin"`
+					Destination string `json:"destination"`
+					DepartDate  string `json:"depart_date"`
+					ReturnDate  string `json:"return_date"`
+					Passengers  int    `json:"passengers"`
+				}
+				json.Unmarshal(variant.Input, &in)
+				links := transportLinks(TransportQuery{
+					Mode: in.Mode, Origin: in.Origin, Destination: in.Destination,
+					DepartDate: in.DepartDate, ReturnDate: in.ReturnDate, Passengers: in.Passengers,
+				})
+				sendSSE(w, "transport", map[string]any{
+					"mode": in.Mode, "origin": in.Origin, "destination": in.Destination, "links": links,
+				})
+				sendSSE(w, "tool_result", map[string]string{"name": "suggest_transport"})
 				b, _ := json.Marshal(links)
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, "Provided browse links: "+string(b), false))
 			}

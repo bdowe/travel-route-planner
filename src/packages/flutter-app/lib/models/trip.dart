@@ -1,6 +1,7 @@
 import 'package:json_annotation/json_annotation.dart';
 import 'itinerary_item.dart';
 import 'accommodation.dart';
+import 'trip_segment.dart';
 
 part 'trip.g.dart';
 
@@ -19,6 +20,7 @@ class Trip {
   final String updatedAt;
   final List<ItineraryItem>? items;
   final List<Accommodation>? accommodations;
+  final List<TripSegment>? segments;
 
   const Trip({
     required this.id,
@@ -30,6 +32,7 @@ class Trip {
     required this.updatedAt,
     this.items,
     this.accommodations,
+    this.segments,
   });
 
   factory Trip.fromJson(Map<String, dynamic> json) => _$TripFromJson(json);
