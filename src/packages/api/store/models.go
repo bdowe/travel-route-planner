@@ -65,6 +65,7 @@ type Trip struct {
 	StartDate pgtype.Date `json:"start_date"`
 	EndDate   pgtype.Date `json:"end_date"`
 	Status    string      `json:"status"`
+	ChatID    *string     `json:"chat_id"`
 }
 
 type TripSegment struct {
@@ -90,4 +91,5 @@ type User struct {
 	Email        string    `json:"email"`
 	PasswordHash string    `json:"password_hash"`
 	DisplayName  *string   `json:"display_name"`
+	IsAdmin      bool      `json:"is_admin"`
 }

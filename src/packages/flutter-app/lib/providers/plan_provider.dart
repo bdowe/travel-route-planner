@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/plan_message.dart';
 import '../models/location.dart';
@@ -57,7 +58,15 @@ class PlanNotifier extends StateNotifier<PlanState> {
   final PlanService _service;
   final ApiClient _apiClient;
 
+  // Stable id for the current conversation. Every create_itinerary in this chat
+  // is stamped with it server-side so refinements collapse to one trip in My
+  // Trips instead of spawning duplicate drafts. Regenerated on reset().
+  String? _chatId;
+
   PlanNotifier(this._service, this._apiClient) : super(const PlanState());
+
+  static String _newChatId() =>
+      'chat-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}';
 
   List<Location> get completedAsLocations {
     final locs = state.completedLocations;
@@ -82,6 +91,8 @@ class PlanNotifier extends StateNotifier<PlanState> {
   Future<void> sendMessage(String text) async {
     if (state.isStreaming) return;
 
+    _chatId ??= _newChatId();
+
     final userMessage = PlanMessage(role: MessageRole.user, content: text);
     final updatedMessages = [...state.messages, userMessage];
 
@@ -100,7 +111,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
     final textBuffer = StringBuffer();
 
     try {
-      await for (final event in _service.streamPlan(history, bearerToken: _apiClient.authToken)) {
+      await for (final event in _service.streamPlan(history, bearerToken: _apiClient.authToken, chatId: _chatId)) {
         switch (event.type) {
           case 'text_delta':
             textBuffer.write(event.data['text'] as String? ?? '');
@@ -162,7 +173,19 @@ class PlanNotifier extends StateNotifier<PlanState> {
     }
   }
 
-  void reset() => state = const PlanState();
+  void reset() {
+    _chatId = null;
+    state = const PlanState();
+  }
+
+  /// Reopen a saved trip for refinement: clears any prior conversation, binds the
+  /// session to the trip's chat group so new itineraries persist as versions of
+  /// it, then sends the seed describing the current itinerary.
+  void beginRefinement({required String chatId, required String seedMessage}) {
+    reset();
+    _chatId = chatId;
+    sendMessage(seedMessage);
+  }
 }
 
 final planProvider = StateNotifierProvider<PlanNotifier, PlanState>((ref) {

@@ -14,6 +14,10 @@ class Trip {
   @JsonKey(name: 'end_date')
   final String? endDate;
   final String status;
+  @JsonKey(name: 'chat_id')
+  final String? chatId;
+  @JsonKey(name: 'version_count')
+  final int? versionCount;
   @JsonKey(name: 'created_at')
   final String createdAt;
   @JsonKey(name: 'updated_at')
@@ -28,6 +32,8 @@ class Trip {
     this.startDate,
     this.endDate,
     required this.status,
+    this.chatId,
+    this.versionCount,
     required this.createdAt,
     required this.updatedAt,
     this.items,

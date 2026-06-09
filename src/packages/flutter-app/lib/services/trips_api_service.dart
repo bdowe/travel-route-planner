@@ -27,6 +27,31 @@ class TripsApiService {
     throw Exception('Failed to load trips (${res.statusCode})');
   }
 
+  /// Ensures the trip has a chat_id (assigning one to legacy trips) and returns
+  /// it, so the AI agent can reopen the trip and append refinements as versions.
+  Future<String> startRefineSession(String tripId) async {
+    final res = await apiClient.httpClient.post(
+      Uri.parse('${apiClient.baseUrl}/trips/$tripId/refine'),
+      headers: _headers(json: true),
+    );
+    if (res.statusCode == 200) {
+      return (jsonDecode(res.body) as Map<String, dynamic>)['chat_id'] as String;
+    }
+    throw Exception('Failed to start refine session (${res.statusCode})');
+  }
+
+  /// Admin-only: every itinerary version a chat produced (newest first).
+  Future<List<Trip>> listTripVersions(String chatId) async {
+    final uri = Uri.parse('${apiClient.baseUrl}/trips/versions')
+        .replace(queryParameters: {'chat_id': chatId});
+    final res = await apiClient.httpClient.get(uri, headers: _headers());
+    if (res.statusCode == 200) {
+      final list = jsonDecode(res.body) as List<dynamic>;
+      return list.map((e) => Trip.fromJson(e as Map<String, dynamic>)).toList();
+    }
+    throw Exception('Failed to load trip versions (${res.statusCode})');
+  }
+
   Future<Trip> getTrip(String id) async {
     final res = await apiClient.httpClient
         .get(Uri.parse('${apiClient.baseUrl}/trips/$id'), headers: _headers());

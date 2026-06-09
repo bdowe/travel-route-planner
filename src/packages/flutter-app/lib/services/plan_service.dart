@@ -17,13 +17,17 @@ class PlanService {
   Stream<PlanEvent> streamPlan(
     List<Map<String, String>> messages, {
     String? bearerToken,
+    String? chatId,
   }) async* {
     final request = http.Request('POST', Uri.parse('$baseUrl/plan'));
     request.headers['Content-Type'] = 'application/json';
     if (bearerToken != null) {
       request.headers['Authorization'] = 'Bearer $bearerToken';
     }
-    request.body = jsonEncode({'messages': messages});
+    request.body = jsonEncode({
+      'messages': messages,
+      if (chatId != null) 'chat_id': chatId,
+    });
 
     final response = await request.send();
 

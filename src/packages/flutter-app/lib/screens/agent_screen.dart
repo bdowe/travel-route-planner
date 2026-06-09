@@ -10,7 +10,12 @@ import 'trip_detail_screen.dart';
 class AgentScreen extends ConsumerStatefulWidget {
   final String? initialMessage;
 
-  const AgentScreen({super.key, this.initialMessage});
+  /// When set (with [initialMessage]), reopens an existing trip for refinement:
+  /// the conversation is bound to this chat group so new itineraries append as
+  /// versions of that trip rather than creating a duplicate.
+  final String? chatId;
+
+  const AgentScreen({super.key, this.initialMessage, this.chatId});
 
   @override
   ConsumerState<AgentScreen> createState() => _AgentScreenState();
@@ -25,7 +30,12 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     super.initState();
     if (widget.initialMessage != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(planProvider.notifier).sendMessage(widget.initialMessage!);
+        final notifier = ref.read(planProvider.notifier);
+        if (widget.chatId != null) {
+          notifier.beginRefinement(chatId: widget.chatId!, seedMessage: widget.initialMessage!);
+        } else {
+          notifier.sendMessage(widget.initialMessage!);
+        }
       });
     }
   }

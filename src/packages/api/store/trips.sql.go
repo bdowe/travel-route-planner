@@ -7,6 +7,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -57,19 +58,25 @@ func (q *Queries) CreateItineraryItem(ctx context.Context, arg CreateItineraryIt
 }
 
 const createTrip = `-- name: CreateTrip :one
-INSERT INTO trips (user_id, title, status)
-VALUES ($1, $2, $3)
-RETURNING id, user_id, created_at, updated_at, title, start_date, end_date, status
+INSERT INTO trips (user_id, title, status, chat_id)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id
 `
 
 type CreateTripParams struct {
 	UserID uuid.UUID `json:"user_id"`
 	Title  string    `json:"title"`
 	Status string    `json:"status"`
+	ChatID *string   `json:"chat_id"`
 }
 
 func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (Trip, error) {
-	row := q.db.QueryRow(ctx, createTrip, arg.UserID, arg.Title, arg.Status)
+	row := q.db.QueryRow(ctx, createTrip,
+		arg.UserID,
+		arg.Title,
+		arg.Status,
+		arg.ChatID,
+	)
 	var i Trip
 	err := row.Scan(
 		&i.ID,
@@ -80,6 +87,7 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (Trip, e
 		&i.StartDate,
 		&i.EndDate,
 		&i.Status,
+		&i.ChatID,
 	)
 	return i, err
 }
@@ -137,7 +145,7 @@ func (q *Queries) GetItineraryItemsByTrip(ctx context.Context, tripID uuid.UUID)
 }
 
 const getTripByIDAndOwner = `-- name: GetTripByIDAndOwner :one
-SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status FROM trips WHERE id = $1 AND user_id = $2
+SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id FROM trips WHERE id = $1 AND user_id = $2
 `
 
 type GetTripByIDAndOwnerParams struct {
@@ -157,12 +165,108 @@ func (q *Queries) GetTripByIDAndOwner(ctx context.Context, arg GetTripByIDAndOwn
 		&i.StartDate,
 		&i.EndDate,
 		&i.Status,
+		&i.ChatID,
 	)
 	return i, err
 }
 
+const listLatestTripsByOwner = `-- name: ListLatestTripsByOwner :many
+SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id, version_count FROM (
+  SELECT DISTINCT ON (COALESCE(chat_id, id::text))
+         id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id,
+         count(*) OVER (PARTITION BY COALESCE(chat_id, id::text)) AS version_count
+  FROM trips WHERE user_id = $1
+  ORDER BY COALESCE(chat_id, id::text), created_at DESC
+) latest ORDER BY created_at DESC
+`
+
+type ListLatestTripsByOwnerRow struct {
+	ID           uuid.UUID   `json:"id"`
+	UserID       uuid.UUID   `json:"user_id"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+	Title        string      `json:"title"`
+	StartDate    pgtype.Date `json:"start_date"`
+	EndDate      pgtype.Date `json:"end_date"`
+	Status       string      `json:"status"`
+	ChatID       *string     `json:"chat_id"`
+	VersionCount int64       `json:"version_count"`
+}
+
+// One row per chat group (latest version), with how many versions exist.
+// Legacy trips with NULL chat_id stand alone (grouped by their own id).
+func (q *Queries) ListLatestTripsByOwner(ctx context.Context, userID uuid.UUID) ([]ListLatestTripsByOwnerRow, error) {
+	rows, err := q.db.Query(ctx, listLatestTripsByOwner, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLatestTripsByOwnerRow
+	for rows.Next() {
+		var i ListLatestTripsByOwnerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.StartDate,
+			&i.EndDate,
+			&i.Status,
+			&i.ChatID,
+			&i.VersionCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTripVersionsByChat = `-- name: ListTripVersionsByChat :many
+SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id FROM trips WHERE user_id = $1 AND chat_id = $2 ORDER BY created_at DESC
+`
+
+type ListTripVersionsByChatParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	ChatID *string   `json:"chat_id"`
+}
+
+func (q *Queries) ListTripVersionsByChat(ctx context.Context, arg ListTripVersionsByChatParams) ([]Trip, error) {
+	rows, err := q.db.Query(ctx, listTripVersionsByChat, arg.UserID, arg.ChatID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Trip
+	for rows.Next() {
+		var i Trip
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.StartDate,
+			&i.EndDate,
+			&i.Status,
+			&i.ChatID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTripsByOwner = `-- name: ListTripsByOwner :many
-SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status FROM trips WHERE user_id = $1 ORDER BY created_at DESC
+SELECT id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id FROM trips WHERE user_id = $1 ORDER BY created_at DESC
 `
 
 func (q *Queries) ListTripsByOwner(ctx context.Context, userID uuid.UUID) ([]Trip, error) {
@@ -183,6 +287,7 @@ func (q *Queries) ListTripsByOwner(ctx context.Context, userID uuid.UUID) ([]Tri
 			&i.StartDate,
 			&i.EndDate,
 			&i.Status,
+			&i.ChatID,
 		); err != nil {
 			return nil, err
 		}
@@ -199,9 +304,10 @@ UPDATE trips
 SET title      = COALESCE($1, title),
     start_date = COALESCE($2, start_date),
     end_date   = COALESCE($3, end_date),
-    status     = COALESCE($4, status)
-WHERE id = $5 AND user_id = $6
-RETURNING id, user_id, created_at, updated_at, title, start_date, end_date, status
+    status     = COALESCE($4, status),
+    chat_id    = COALESCE($5, chat_id)
+WHERE id = $6 AND user_id = $7
+RETURNING id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id
 `
 
 type UpdateTripParams struct {
@@ -209,6 +315,7 @@ type UpdateTripParams struct {
 	StartDate pgtype.Date `json:"start_date"`
 	EndDate   pgtype.Date `json:"end_date"`
 	Status    *string     `json:"status"`
+	ChatID    *string     `json:"chat_id"`
 	ID        uuid.UUID   `json:"id"`
 	UserID    uuid.UUID   `json:"user_id"`
 }
@@ -219,6 +326,7 @@ func (q *Queries) UpdateTrip(ctx context.Context, arg UpdateTripParams) (Trip, e
 		arg.StartDate,
 		arg.EndDate,
 		arg.Status,
+		arg.ChatID,
 		arg.ID,
 		arg.UserID,
 	)
@@ -232,6 +340,7 @@ func (q *Queries) UpdateTrip(ctx context.Context, arg UpdateTripParams) (Trip, e
 		&i.StartDate,
 		&i.EndDate,
 		&i.Status,
+		&i.ChatID,
 	)
 	return i, err
 }

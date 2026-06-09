@@ -8,6 +8,8 @@ class UserModel {
   final String email;
   @JsonKey(name: 'display_name')
   final String displayName;
+  @JsonKey(name: 'is_admin')
+  final bool isAdmin;
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -15,6 +17,7 @@ class UserModel {
     required this.id,
     required this.email,
     required this.displayName,
+    this.isAdmin = false,
     required this.createdAt,
   });
 

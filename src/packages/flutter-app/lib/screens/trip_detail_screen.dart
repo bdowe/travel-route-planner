@@ -11,6 +11,7 @@ import '../providers/transport_provider.dart';
 import '../services/accommodations_api_service.dart';
 import '../services/airbnb_api_service.dart';
 import '../services/transport_api_service.dart';
+import 'agent_screen.dart';
 
 class TripDetailScreen extends ConsumerStatefulWidget {
   final String tripId;
@@ -23,6 +24,7 @@ class TripDetailScreen extends ConsumerStatefulWidget {
 class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   Trip? _trip;
   bool _loading = true;
+  bool _refining = false;
   String? _error;
   String _itemFilter = 'all'; // 'all' | 'attraction' | 'restaurant'
 
@@ -94,6 +96,43 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     if (range != null) {
       await _patch(startDate: _fmt(range.start), endDate: _fmt(range.end));
     }
+  }
+
+  Future<void> _refine(Trip trip) async {
+    final items = trip.items ?? [];
+    if (items.isEmpty) {
+      _showSnack('Add some places before refining with AI.');
+      return;
+    }
+    setState(() => _refining = true);
+    try {
+      final chatId = await ref.read(tripsApiServiceProvider).startRefineSession(trip.id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AgentScreen(chatId: chatId, initialMessage: _buildRefineSeed(trip)),
+        ),
+      );
+    } catch (e) {
+      _showSnack('Could not start refine session: $e');
+    } finally {
+      if (mounted) setState(() => _refining = false);
+    }
+  }
+
+  /// Builds the seed message that hands the agent the trip's current itinerary,
+  /// including coordinates so it can keep unchanged places without re-searching.
+  String _buildRefineSeed(Trip trip) {
+    final b = StringBuffer("Here's my current itinerary for \"${trip.title}\":\n");
+    final items = trip.items ?? [];
+    for (var i = 0; i < items.length; i++) {
+      final it = items[i];
+      final category = it.category != null ? ' [${it.category}]' : '';
+      b.writeln('${i + 1}. ${it.name}$category (${it.latitude}, ${it.longitude})');
+    }
+    b.write("\nI'd like to refine this trip. When we're done, call create_itinerary "
+        "with the full updated list of places.");
+    return b.toString();
   }
 
   Future<void> _delete() async {
@@ -214,6 +253,21 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                               },
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _refining ? null : () => _refine(trip),
+                            icon: _refining
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.auto_awesome),
+                            label: Text(_refining ? 'Opening…' : 'Refine with AI'),
+                          ),
                         ),
                         const Divider(height: 32),
                         Text('Itinerary', style: theme.textTheme.titleMedium),

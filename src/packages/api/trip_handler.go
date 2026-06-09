@@ -39,6 +39,8 @@ type TripResponse struct {
 	StartDate      *string                 `json:"start_date,omitempty"`
 	EndDate        *string                 `json:"end_date,omitempty"`
 	Status         string                  `json:"status"`
+	ChatID         *string                 `json:"chat_id,omitempty"`
+	VersionCount   int                     `json:"version_count"`
 	CreatedAt      time.Time               `json:"created_at"`
 	UpdatedAt      time.Time               `json:"updated_at"`
 	Items          []ItineraryItemResponse `json:"items,omitempty"`
@@ -72,6 +74,7 @@ func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []
 		StartDate: dateToPtr(t.StartDate),
 		EndDate:   dateToPtr(t.EndDate),
 		Status:    t.Status,
+		ChatID:    t.ChatID,
 		CreatedAt: t.CreatedAt,
 		UpdatedAt: t.UpdatedAt,
 	}
@@ -98,7 +101,9 @@ func toTripResponse(t store.Trip, items []store.ItineraryItem, accommodations []
 
 // persistTrip saves a finalized itinerary as a Trip owned by userID, in a single
 // transaction. Called from the agent's create_itinerary step for signed-in users.
-func persistTrip(ctx context.Context, userID uuid.UUID, summary string, locations []map[string]any) (string, error) {
+// chatID stamps the trip with its conversation so My Trips can collapse repeated
+// refinements to the latest version; an empty chatID is stored as NULL.
+func persistTrip(ctx context.Context, userID uuid.UUID, chatID, summary string, locations []map[string]any) (string, error) {
 	tx, err := dbPool.Begin(ctx)
 	if err != nil {
 		return "", err
@@ -118,7 +123,11 @@ func persistTrip(ctx context.Context, userID uuid.UUID, summary string, location
 		}
 	}
 
-	trip, err := q.CreateTrip(ctx, store.CreateTripParams{UserID: userID, Title: title, Status: "draft"})
+	var chatPtr *string
+	if c := strings.TrimSpace(chatID); c != "" {
+		chatPtr = &c
+	}
+	trip, err := q.CreateTrip(ctx, store.CreateTripParams{UserID: userID, Title: title, Status: "draft", ChatID: chatPtr})
 	if err != nil {
 		return "", err
 	}
@@ -170,11 +179,52 @@ func tripIDFromPath(r *http.Request) (uuid.UUID, bool) {
 
 // --- handlers (all behind authMiddleware) ---
 
+// listTripsHandler returns one trip per chat group (the latest version), each
+// carrying version_count so admins can surface the older versions.
 func listTripsHandler(w http.ResponseWriter, r *http.Request) {
 	user, _ := userFromContext(r.Context())
-	trips, err := store.New(dbPool).ListTripsByOwner(r.Context(), user.ID)
+	trips, err := store.New(dbPool).ListLatestTripsByOwner(r.Context(), user.ID)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not load trips")
+		return
+	}
+	out := make([]TripResponse, 0, len(trips))
+	for _, t := range trips {
+		resp := toTripResponse(store.Trip{
+			ID:        t.ID,
+			UserID:    t.UserID,
+			CreatedAt: t.CreatedAt,
+			UpdatedAt: t.UpdatedAt,
+			Title:     t.Title,
+			StartDate: t.StartDate,
+			EndDate:   t.EndDate,
+			Status:    t.Status,
+			ChatID:    t.ChatID,
+		}, nil, nil, nil)
+		resp.VersionCount = int(t.VersionCount)
+		out = append(out, resp)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// listTripVersionsHandler returns every trip in a chat group (newest first).
+// Admin-only — used to inspect the itinerary versions a single chat produced.
+func listTripVersionsHandler(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	if !user.IsAdmin {
+		writeJSONError(w, http.StatusForbidden, "admin access required")
+		return
+	}
+	chatID := strings.TrimSpace(r.URL.Query().Get("chat_id"))
+	if chatID == "" {
+		writeJSONError(w, http.StatusBadRequest, "chat_id is required")
+		return
+	}
+	trips, err := store.New(dbPool).ListTripVersionsByChat(r.Context(), store.ListTripVersionsByChatParams{
+		UserID: user.ID, ChatID: &chatID,
+	})
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "could not load trip versions")
 		return
 	}
 	out := make([]TripResponse, 0, len(trips))
@@ -213,6 +263,44 @@ func getTripHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toTripResponse(trip, items, accommodations, segments))
+}
+
+// refineTripHandler returns the chat_id to reopen a saved trip in the AI agent,
+// assigning one to legacy (NULL chat_id) trips so the agent's new itineraries
+// append as versions of this same trip instead of spawning a duplicate card.
+func refineTripHandler(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	id, ok := tripIDFromPath(r)
+	if !ok {
+		writeJSONError(w, http.StatusNotFound, "trip not found")
+		return
+	}
+	q := store.New(dbPool)
+	trip, err := q.GetTripByIDAndOwner(r.Context(), store.GetTripByIDAndOwnerParams{ID: id, UserID: user.ID})
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, "trip not found")
+		return
+	}
+
+	chatID := trip.ChatID
+	if chatID == nil {
+		token, err := generateSessionToken()
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "could not start refine session")
+			return
+		}
+		newID := "chat-" + token
+		updated, err := q.UpdateTrip(r.Context(), store.UpdateTripParams{
+			ChatID: &newID, ID: id, UserID: user.ID,
+		})
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "could not start refine session")
+			return
+		}
+		chatID = updated.ChatID
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"chat_id": *chatID})
 }
 
 func patchTripHandler(w http.ResponseWriter, r *http.Request) {

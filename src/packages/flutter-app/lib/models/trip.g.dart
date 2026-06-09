@@ -12,6 +12,8 @@ Trip _$TripFromJson(Map<String, dynamic> json) => Trip(
       startDate: json['start_date'] as String?,
       endDate: json['end_date'] as String?,
       status: json['status'] as String,
+      chatId: json['chat_id'] as String?,
+      versionCount: (json['version_count'] as num?)?.toInt(),
       createdAt: json['created_at'] as String,
       updatedAt: json['updated_at'] as String,
       items: (json['items'] as List<dynamic>?)
@@ -31,6 +33,8 @@ Map<String, dynamic> _$TripToJson(Trip instance) => <String, dynamic>{
       'start_date': instance.startDate,
       'end_date': instance.endDate,
       'status': instance.status,
+      'chat_id': instance.chatId,
+      'version_count': instance.versionCount,
       'created_at': instance.createdAt,
       'updated_at': instance.updatedAt,
       'items': instance.items?.map((e) => e.toJson()).toList(),

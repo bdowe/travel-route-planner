@@ -1,6 +1,6 @@
 -- name: CreateTrip :one
-INSERT INTO trips (user_id, title, status)
-VALUES ($1, $2, $3)
+INSERT INTO trips (user_id, title, status, chat_id)
+VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: CreateItineraryItem :one
@@ -10,6 +10,20 @@ RETURNING *;
 
 -- name: ListTripsByOwner :many
 SELECT * FROM trips WHERE user_id = $1 ORDER BY created_at DESC;
+
+-- name: ListLatestTripsByOwner :many
+-- One row per chat group (latest version), with how many versions exist.
+-- Legacy trips with NULL chat_id stand alone (grouped by their own id).
+SELECT * FROM (
+  SELECT DISTINCT ON (COALESCE(chat_id, id::text))
+         id, user_id, created_at, updated_at, title, start_date, end_date, status, chat_id,
+         count(*) OVER (PARTITION BY COALESCE(chat_id, id::text)) AS version_count
+  FROM trips WHERE user_id = $1
+  ORDER BY COALESCE(chat_id, id::text), created_at DESC
+) latest ORDER BY created_at DESC;
+
+-- name: ListTripVersionsByChat :many
+SELECT * FROM trips WHERE user_id = $1 AND chat_id = $2 ORDER BY created_at DESC;
 
 -- name: GetTripByIDAndOwner :one
 SELECT * FROM trips WHERE id = $1 AND user_id = $2;
@@ -22,7 +36,8 @@ UPDATE trips
 SET title      = COALESCE(sqlc.narg('title'), title),
     start_date = COALESCE(sqlc.narg('start_date'), start_date),
     end_date   = COALESCE(sqlc.narg('end_date'), end_date),
-    status     = COALESCE(sqlc.narg('status'), status)
+    status     = COALESCE(sqlc.narg('status'), status),
+    chat_id    = COALESCE(sqlc.narg('chat_id'), chat_id)
 WHERE id = sqlc.arg('id') AND user_id = sqlc.arg('user_id')
 RETURNING *;
 

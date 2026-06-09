@@ -31,6 +31,7 @@ type UserResponse struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
+	IsAdmin     bool      `json:"is_admin"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -48,6 +49,7 @@ func toUserResponse(u store.User) UserResponse {
 		ID:          u.ID.String(),
 		Email:       u.Email,
 		DisplayName: name,
+		IsAdmin:     u.IsAdmin,
 		CreatedAt:   u.CreatedAt,
 	}
 }

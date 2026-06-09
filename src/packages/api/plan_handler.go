@@ -16,6 +16,7 @@ import (
 
 type PlanRequest struct {
 	Messages []PlanChatMessage `json:"messages"`
+	ChatID   string            `json:"chat_id"`
 }
 
 type PlanChatMessage struct {
@@ -264,7 +265,7 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				// Persist the trip only for signed-in callers; anonymous sessions
 				// stay ephemeral (no trip_id in the done event).
 				if authed {
-					if tripID, err := persistTrip(ctx, uid, in.Summary, in.Locations); err != nil {
+					if tripID, err := persistTrip(ctx, uid, req.ChatID, in.Summary, in.Locations); err != nil {
 						log.Printf("failed to persist trip: %v", err)
 					} else {
 						donePayload["trip_id"] = tripID
