@@ -30,7 +30,16 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   bool _refining = false;
   String? _error;
   String _itemFilter = 'all'; // 'all' | 'attraction' | 'restaurant'
-  int? _selectedItem; // index of the place focused via a map pin tap
+  int? _selectedPosition; // position of the place focused via a map pin / list tap
+
+  /// Itinerary items matching the active category filter, used by both the map
+  /// and the list so they stay in sync.
+  List<ItineraryItem> _filtered(Trip trip) {
+    final items = trip.items ?? const <ItineraryItem>[];
+    return _itemFilter == 'all'
+        ? items.toList()
+        : items.where((i) => i.category == _itemFilter).toList();
+  }
 
   @override
   void initState() {
@@ -337,17 +346,18 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                           ),
                         ),
                         const Divider(height: 32),
-                        if ((trip.items ?? []).any((i) => i.latitude != 0 || i.longitude != 0)) ...[
+                        if (_filtered(trip).any((i) => i.latitude != 0 || i.longitude != 0)) ...[
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: SizedBox(
                               height: 240,
                               child: TripMap(
-                                items: trip.items!,
-                                selectedIndex: _selectedItem,
-                                onPinTap: (i) {
-                                  setState(() => _selectedItem = i);
-                                  _showSnack(trip.items![i].name);
+                                items: _filtered(trip),
+                                selectedPosition: _selectedPosition,
+                                onPinTap: (pos) {
+                                  setState(() => _selectedPosition = pos);
+                                  final it = trip.items!.firstWhere((i) => i.position == pos);
+                                  _showSnack(it.name);
                                 },
                               ),
                             ),
@@ -379,9 +389,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                           )
                         else
                           Builder(builder: (_) {
-                            final filtered = _itemFilter == 'all'
-                                ? trip.items!
-                                : trip.items!.where((i) => i.category == _itemFilter).toList();
+                            final filtered = _filtered(trip);
                             if (filtered.isEmpty) {
                               return const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 16),
@@ -426,11 +434,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                       title: Text(item.name),
                                       subtitle:
                                           item.address != null ? Text(item.address!) : null,
-                                      selected: _selectedItem == trip.items!.indexOf(item),
+                                      selected: _selectedPosition == item.position,
                                       selectedTileColor:
                                           theme.colorScheme.primary.withValues(alpha: 0.08),
                                       onTap: () => setState(
-                                          () => _selectedItem = trip.items!.indexOf(item)),
+                                          () => _selectedPosition = item.position),
                                     ),
                                 ],
                               ],

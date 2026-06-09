@@ -42,4 +42,14 @@ WHERE id = sqlc.arg('id') AND user_id = sqlc.arg('user_id')
 RETURNING *;
 
 -- name: DeleteTrip :execrows
-DELETE FROM trips WHERE id = $1 AND user_id = $2;
+-- Deletes the trip and, when it belongs to a chat group, all its versions.
+-- Legacy trips (chat_id NULL) match only by id, so a single row is removed.
+DELETE FROM trips t
+WHERE t.user_id = sqlc.arg('user_id')
+  AND (
+    t.id = sqlc.arg('id')
+    OR t.chat_id = (
+      SELECT chat_id FROM trips
+      WHERE id = sqlc.arg('id') AND user_id = sqlc.arg('user_id') AND chat_id IS NOT NULL
+    )
+  );

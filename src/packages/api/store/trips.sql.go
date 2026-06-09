@@ -93,16 +93,26 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (Trip, e
 }
 
 const deleteTrip = `-- name: DeleteTrip :execrows
-DELETE FROM trips WHERE id = $1 AND user_id = $2
+DELETE FROM trips t
+WHERE t.user_id = $1
+  AND (
+    t.id = $2
+    OR t.chat_id = (
+      SELECT chat_id FROM trips
+      WHERE id = $2 AND user_id = $1 AND chat_id IS NOT NULL
+    )
+  )
 `
 
 type DeleteTripParams struct {
-	ID     uuid.UUID `json:"id"`
 	UserID uuid.UUID `json:"user_id"`
+	ID     uuid.UUID `json:"id"`
 }
 
+// Deletes the trip and, when it belongs to a chat group, all its versions.
+// Legacy trips (chat_id NULL) match only by id, so a single row is removed.
 func (q *Queries) DeleteTrip(ctx context.Context, arg DeleteTripParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteTrip, arg.ID, arg.UserID)
+	result, err := q.db.Exec(ctx, deleteTrip, arg.UserID, arg.ID)
 	if err != nil {
 		return 0, err
 	}

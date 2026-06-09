@@ -6,16 +6,16 @@ import '../models/itinerary_item.dart';
 
 /// Plots a trip's itinerary on an OpenStreetMap: a numbered, category-tinted pin
 /// per place, a route line connecting them in itinerary order, auto-fit to the
-/// trip's extent. Tapping a pin calls [onPinTap] with that item's index.
+/// trip's extent. Tapping a pin calls [onPinTap] with that item's position.
 class TripMap extends StatelessWidget {
   final List<ItineraryItem> items;
-  final int? selectedIndex;
-  final void Function(int index)? onPinTap;
+  final int? selectedPosition;
+  final void Function(int position)? onPinTap;
 
   const TripMap({
     super.key,
     required this.items,
-    this.selectedIndex,
+    this.selectedPosition,
     this.onPinTap,
   });
 
@@ -26,12 +26,10 @@ class TripMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Keep the original item index so taps map back to the itinerary list.
-    final mapped = <({int index, ItineraryItem item, LatLng point})>[];
-    for (var i = 0; i < items.length; i++) {
-      final it = items[i];
+    final mapped = <({ItineraryItem item, LatLng point})>[];
+    for (final it in items) {
       if (_hasCoords(it)) {
-        mapped.add((index: i, item: it, point: LatLng(it.latitude, it.longitude)));
+        mapped.add((item: it, point: LatLng(it.latitude, it.longitude)));
       }
     }
 
@@ -90,8 +88,8 @@ class TripMap extends StatelessWidget {
                   child: _Pin(
                     label: '${m.item.position + 1}',
                     category: m.item.category,
-                    selected: selectedIndex == m.index,
-                    onTap: onPinTap == null ? null : () => onPinTap!(m.index),
+                    selected: selectedPosition == m.item.position,
+                    onTap: onPinTap == null ? null : () => onPinTap!(m.item.position),
                   ),
                 ),
             ],
