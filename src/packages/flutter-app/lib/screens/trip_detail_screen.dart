@@ -624,7 +624,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       final dt = items[i].dayTripFrom?.trim();
       if (dt != null && dt.isNotEmpty) {
         final town = _cityOf(items[i]) ?? 'Day trip';
-        widgets.add(_dayTripSubHeader(town, theme));
+        widgets.add(_dayTripSubHeader(town, theme, _dayTripTravelLabel(items[i])));
         prev = null; // don't draw a connector across the sub-header
         while (i < items.length) {
           final it = items[i];
@@ -712,6 +712,28 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     return out;
   }
 
+  /// Travel time from the hub city to a day trip, e.g. "45 min from Paris",
+  /// taken from the already-computed leg into the day trip's first stop. Null
+  /// unless the preceding item is actually in the hub city (so a town-to-town
+  /// or cross-city leg is never mislabeled), or while a category filter is
+  /// active (filtered tiles aren't globally adjacent).
+  String? _dayTripTravelLabel(ItineraryItem first) {
+    if (_itemFilter != 'all') return null;
+    final hub = first.dayTripFrom?.trim();
+    if (hub == null || hub.isEmpty) return null;
+    ItineraryItem? prev;
+    for (final it in _trip?.items ?? const <ItineraryItem>[]) {
+      if (it.position == first.position - 1) prev = it;
+    }
+    if (prev == null) return null;
+    final prevDayTrip = prev.dayTripFrom?.trim();
+    if (prevDayTrip != null && prevDayTrip.isNotEmpty) return null;
+    if (_hubOf(prev) != _hubOf(first)) return null;
+    final timing = _travelByPos[prev.position];
+    if (timing == null || timing.travelToNextMin <= 0) return null;
+    return '${_fmtTravel(timing.travelToNextMin)} from $hub';
+  }
+
   /// Formats a travel duration: "45 min", "1h", or "1h 20m".
   String _fmtTravel(int min) {
     if (min < 60) return '$min min';
@@ -772,19 +794,32 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     );
   }
 
-  Widget _dayTripSubHeader(String town, ThemeData theme) => Padding(
+  Widget _dayTripSubHeader(String town, ThemeData theme, String? travelLabel) =>
+      Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
         child: Row(
           children: [
             Icon(Icons.directions_bus, size: 16, color: theme.colorScheme.secondary),
             const SizedBox(width: 6),
-            Text(
-              'Day trip · $town',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.secondary,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                'Day trip · $town',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
+            if (travelLabel != null) ...[
+              Icon(Icons.directions_car_outlined, size: 14,
+                  color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                travelLabel,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       );
