@@ -88,10 +88,11 @@ Create `src/packages/api/.env` (see `.env.sample`):
 ```
 GOOGLE_PLACES_API_KEY=...   # Required for /places/* endpoints
 ANTHROPIC_API_KEY=...       # Required for /api/v1/plan SSE endpoint
+DUFFEL_ACCESS_TOKEN=...     # Required for /flights/* endpoints (Duffel; test or live token)
 DATABASE_URL=...            # Postgres connection; absent/unreachable => degraded mode (no persistence)
 ```
 
-Without `GOOGLE_PLACES_API_KEY`, place search endpoints return errors. The `/plan` handler also calls `search_places` internally, which will fail without the key.
+Without `GOOGLE_PLACES_API_KEY`, place search endpoints return errors. The `/plan` handler also calls `search_places` internally, which will fail without the key. Without `DUFFEL_ACCESS_TOKEN`, the `/flights/*` endpoints return a configured-error; the rest of the API is unaffected.
 
 ## API Endpoints
 
@@ -102,6 +103,8 @@ Without `GOOGLE_PLACES_API_KEY`, place search endpoints return errors. The `/pla
 | GET | `/api/v1/places/search?q=` | Google Places Text Search |
 | GET | `/api/v1/places/autocomplete?input=` | Google Places Autocomplete |
 | GET | `/api/v1/places/details?place_id=` | Google Places Details |
+| GET | `/api/v1/flights/airports?q=` | Duffel airport/city autocomplete (IATA codes) |
+| POST | `/api/v1/flights/search` | Duffel flight offers, ranked by `optimize_for` (`cost`/`time`/`balanced`) |
 | POST | `/api/v1/plan` | SSE stream; Claude claude-sonnet-4-6 with `search_places` tool |
 
 ## Key Constraints
@@ -109,5 +112,6 @@ Without `GOOGLE_PLACES_API_KEY`, place search endpoints return errors. The `/pla
 - `Location.Latitude` and `Location.Longitude` in the Go API are `*float64` (pointers) to distinguish "not provided" from zero — coordinate validation is skipped when nil to support name-only location resolution.
 - The `/plan` endpoint uses `text/event-stream` with `http.Flusher`; the server `WriteTimeout` must stay at `0`.
 - Flutter models use `json_serializable`; never edit `.g.dart` files by hand.
-- The `optimize_for` field on country routes accepts only `"distance"`, `"season"`, or `"balanced"` (empty string defaults to balanced).
+- The `optimize_for` field on country routes accepts only `"distance"`, `"season"`, or `"balanced"` (empty string defaults to balanced). On flight search it accepts `"cost"`, `"time"`, or `"balanced"` (empty defaults to balanced).
+- Flight search inputs are **IATA codes** (e.g. `JFK`, `CDG`), not city names — resolve names via `/flights/airports?q=` first. Flight data comes from **Duffel** (`duffel_service.go`, process-wide `duffelService` singleton, static `DUFFEL_ACCESS_TOKEN`); the provider is isolated to that one file behind the `FlightOffer`/`Airport` types so it can be swapped without touching the handler, optimizer, or Flutter app.
 - Persistence uses **pgx + sqlc + goose** (Postgres). The `store/` package is sqlc-generated — run `make api-sqlc` after editing `query/*.sql` or the schema; never hand-edit it. UUID primary keys; migrations run on boot and via `make api-migrate`.

@@ -7,6 +7,7 @@ import 'route_optimizer_screen.dart';
 import 'country_optimizer_screen.dart';
 import 'agent_screen.dart';
 import 'airbnb_parser_screen.dart';
+import 'flight_search_screen.dart';
 import 'trips_list_screen.dart';
 import 'preferences_screen.dart';
 
@@ -125,6 +126,19 @@ class HomeScreen extends ConsumerWidget {
                 description: 'Optimize routes for multiple locations in a city',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RouteOptimizerScreen()),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Find Flights
+              _ToolRow(
+                icon: MdiIcons.airplane,
+                color: Colors.teal.shade700,
+                title: 'Find Flights',
+                description: 'Search and rank flights by price, time, and stops',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const FlightSearchScreen()),
                 ),
               ),
 

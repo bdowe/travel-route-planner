@@ -9,8 +9,12 @@ void main() {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const ProviderScope(child: TravelRoutePlannerApp()));
 
-    // Verify that the app title is shown
-    expect(find.text('Travel Route Planner'), findsOneWidget);
-    expect(find.text('Welcome to Travel Route Planner'), findsOneWidget);
+    // The app builds its MaterialApp shell. On the first frame the AuthGate
+    // shows a loading splash while the stored session is checked (no network in
+    // the test env), then routes to sign-in/home — so we assert the shell builds
+    // cleanly rather than coupling to any one screen's text.
+    expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
