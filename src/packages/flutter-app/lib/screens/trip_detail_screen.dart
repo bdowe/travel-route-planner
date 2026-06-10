@@ -39,7 +39,6 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   // keyed by "<city>#<day>" since day numbers repeat across cities.
   final Set<String> _collapsedCities = {};
   final Set<String> _collapsedDays = {};
-  final GlobalKey _mapKey = GlobalKey(); // for scrolling the trip map into view on tap
   String? _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
   // todo_key -> flight leg, so a transport booking item can open Find Flights prefilled.
   Map<String, ({String origin, String destination, String? date})> _flightLegs = {};
@@ -719,22 +718,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
           ),
           selected: _selectedPosition == item.position,
           selectedTileColor: theme.colorScheme.primary.withValues(alpha: 0.08),
-          onTap: () {
-            setState(() => _selectedPosition = item.position);
-            _scrollToMap();
-          },
+          // The map is pinned and always on screen, so tapping an item only
+          // needs to update the selection; TripMap recenters on the new pin.
+          onTap: () => setState(() => _selectedPosition = item.position),
         ),
       );
-
-  /// Scrolls the page so the trip map is visible (focusing the tapped pin). No-op
-  /// when the trip has no mappable items, so the map isn't built.
-  void _scrollToMap() {
-    final ctx = _mapKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(ctx,
-          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
-    }
-  }
 
   /// Google Maps deep link for a place: prefer place_id, then coordinates, then a
   /// name/address text search.
@@ -1081,175 +1069,227 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                 )
               : trip == null
                   ? const SizedBox.shrink()
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        _buildHeaderCard(trip, theme),
-                        const Divider(height: 32),
-                        if (_filtered(trip).any((i) => i.latitude != 0 || i.longitude != 0)) ...[
-                          ClipRRect(
-                            key: _mapKey,
-                            borderRadius: BorderRadius.circular(12),
-                            child: SizedBox(
-                              height: 240,
-                              child: TripMap(
-                                items: _filtered(trip),
-                                selectedPosition: _selectedPosition,
-                                segmentLabels: _segmentLabels(),
-                                onPinTap: (pos) {
-                                  setState(() => _selectedPosition = pos);
-                                  final it = trip.items!.firstWhere((i) => i.position == pos);
-                                  _showSnack(it.name);
-                                },
+                  : CustomScrollView(
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildHeaderCard(trip, theme),
+                                const Divider(height: 32),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // The map scrolls with the page until it reaches the top,
+                        // then stays pinned while the itinerary scrolls beneath it.
+                        if (_filtered(trip).any((i) => i.latitude != 0 || i.longitude != 0))
+                          SliverPersistentHeader(
+                            pinned: true,
+                            delegate: _PinnedHeaderDelegate(
+                              height: 12 + 240 + 12, // top gap + map + bottom gap
+                              backgroundColor: theme.scaffoldBackgroundColor,
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: TripMap(
+                                  items: _filtered(trip),
+                                  selectedPosition: _selectedPosition,
+                                  segmentLabels: _segmentLabels(),
+                                  onPinTap: (pos) {
+                                    setState(() => _selectedPosition = pos);
+                                    final it = trip.items!.firstWhere((i) => i.position == pos);
+                                    _showSnack(it.name);
+                                  },
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
-                        ],
-                        Text('Itinerary', style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        if ((trip.items ?? []).isNotEmpty)
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              for (final f in const [
-                                ('all', 'All'),
-                                ('attraction', 'Attractions'),
-                                ('restaurant', 'Restaurants'),
-                              ])
-                                ChoiceChip(
-                                  label: Text(f.$2),
-                                  selected: _itemFilter == f.$1,
-                                  onSelected: (_) => setState(() => _itemFilter = f.$1),
-                                ),
-                            ],
+                        // Itinerary title + category filter; pins beneath the
+                        // map so the filter stays reachable while scrolling.
+                        SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _PinnedHeaderDelegate(
+                            // title (24) + gap (8) + chip row (48) + bottom
+                            // padding (8); title-only when there are no items.
+                            height:
+                                (trip.items ?? const []).isNotEmpty ? 92 : 40,
+                            backgroundColor: theme.scaffoldBackgroundColor,
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            // Align fills the header's full extent so the child's
+                            // measured height matches maxExtent (a min-sized
+                            // Column would be shorter, yielding an invalid sliver
+                            // geometry: layoutExtent > paintExtent).
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Itinerary',
+                                      style: theme.textTheme.titleMedium),
+                                  if ((trip.items ?? const []).isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 8,
+                                      children: [
+                                        for (final f in const [
+                                          ('all', 'All'),
+                                          ('attraction', 'Attractions'),
+                                          ('restaurant', 'Restaurants'),
+                                        ])
+                                          ChoiceChip(
+                                            label: Text(f.$2),
+                                            selected: _itemFilter == f.$1,
+                                            onSelected: (_) => setState(
+                                                () => _itemFilter = f.$1),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ),
-                        if ((trip.items ?? []).isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Text('No places added.'),
-                          )
-                        else
-                          Builder(builder: (_) {
-                            final filtered = _filtered(trip);
-                            if (filtered.isEmpty) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 16),
-                                child: Text('No items match this filter.'),
-                              );
-                            }
-                            final groups = _buildGroups(filtered, _locationDates(trip));
-                            return Column(
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                          sliver: SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                for (final group in groups) ...[
+                                if ((trip.items ?? []).isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 16),
+                                    child: Text('No places added.'),
+                                  )
+                                else
                                   Builder(builder: (_) {
-                                    final cityCollapsed =
-                                        _collapsedCities.contains(group.label);
-                                    return InkWell(
-                                      onTap: () => setState(() {
-                                        if (cityCollapsed) {
-                                          _collapsedCities.remove(group.label);
-                                        } else {
-                                          _collapsedCities.add(group.label);
-                                        }
-                                      }),
-                                      child: Padding(
-                                        padding:
-                                            const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Icon(Icons.location_on,
-                                                    size: 18,
-                                                    color: theme.colorScheme.primary),
-                                                const SizedBox(width: 6),
-                                                Expanded(
-                                                  child: Text(
-                                                    group.label,
-                                                    style: theme.textTheme.titleSmall
-                                                        ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.bold),
-                                                  ),
+                                    final filtered = _filtered(trip);
+                                    if (filtered.isEmpty) {
+                                      return const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 16),
+                                        child: Text('No items match this filter.'),
+                                      );
+                                    }
+                                    final groups = _buildGroups(filtered, _locationDates(trip));
+                                    return Column(
+                                      children: [
+                                        for (final group in groups) ...[
+                                          Builder(builder: (_) {
+                                            final cityCollapsed =
+                                                _collapsedCities.contains(group.label);
+                                            return InkWell(
+                                              onTap: () => setState(() {
+                                                if (cityCollapsed) {
+                                                  _collapsedCities.remove(group.label);
+                                                } else {
+                                                  _collapsedCities.add(group.label);
+                                                }
+                                              }),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Icon(Icons.location_on,
+                                                            size: 18,
+                                                            color: theme.colorScheme.primary),
+                                                        const SizedBox(width: 6),
+                                                        Expanded(
+                                                          child: Text(
+                                                            group.label,
+                                                            style: theme.textTheme.titleSmall
+                                                                ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight.bold),
+                                                          ),
+                                                        ),
+                                                        if (group.dateRange != null) ...[
+                                                          Icon(Icons.event,
+                                                              size: 14,
+                                                              color:
+                                                                  theme.colorScheme.primary),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            group.dateRange!,
+                                                            style: theme.textTheme.labelMedium
+                                                                ?.copyWith(
+                                                                    color: theme
+                                                                        .colorScheme.primary),
+                                                          ),
+                                                        ],
+                                                        const SizedBox(width: 4),
+                                                        Icon(
+                                                          cityCollapsed
+                                                              ? Icons.chevron_right
+                                                              : Icons.expand_more,
+                                                          size: 20,
+                                                          color: theme.colorScheme.primary,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    const Divider(height: 1),
+                                                  ],
                                                 ),
-                                                if (group.dateRange != null) ...[
-                                                  Icon(Icons.event,
-                                                      size: 14,
-                                                      color:
-                                                          theme.colorScheme.primary),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    group.dateRange!,
-                                                    style: theme.textTheme.labelMedium
-                                                        ?.copyWith(
-                                                            color: theme
-                                                                .colorScheme.primary),
-                                                  ),
-                                                ],
-                                                const SizedBox(width: 4),
-                                                Icon(
-                                                  cityCollapsed
-                                                      ? Icons.chevron_right
-                                                      : Icons.expand_more,
-                                                  size: 20,
-                                                  color: theme.colorScheme.primary,
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            const Divider(height: 1),
-                                          ],
-                                        ),
-                                      ),
+                                              ),
+                                            );
+                                          }),
+                                          if (!_collapsedCities.contains(group.label))
+                                            ..._buildGroupItemWidgets(
+                                                group.label,
+                                                group.items,
+                                                theme,
+                                                DateTime.tryParse(trip.startDate ?? '')),
+                                        ],
+                                      ],
                                     );
                                   }),
-                                  if (!_collapsedCities.contains(group.label))
-                                    ..._buildGroupItemWidgets(
-                                        group.label,
-                                        group.items,
-                                        theme,
-                                        DateTime.tryParse(trip.startDate ?? '')),
-                                ],
+                                const Divider(height: 32),
+                                Row(
+                                  children: [
+                                    Expanded(child: Text('Bookings', style: theme.textTheme.titleMedium)),
+                                    TextButton.icon(
+                                      onPressed: _addBooking,
+                                      icon: const Icon(Icons.add, size: 18),
+                                      label: const Text('Add'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                if (_bookingTodos.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 8),
+                                    child: Text(
+                                        'No bookings yet — they appear here once your itinerary has places.'),
+                                  )
+                                else
+                                  for (final todo in _bookingTodos)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 4),
+                                      child: BookingTodoCard(
+                                        todo: todo,
+                                        onBookedChanged: (v) => _setBooked(todo, v),
+                                        onOpen: _openCallbackFor(todo),
+                                        openLabelOverride:
+                                            _flightLegs.containsKey(todo.todoKey)
+                                                ? 'Find flights'
+                                                : null,
+                                        onDelete:
+                                            todo.auto ? null : () => _deleteTodo(todo),
+                                      ),
+                                    ),
                               ],
-                            );
-                          }),
-                        const Divider(height: 32),
-                        Row(
-                          children: [
-                            Expanded(child: Text('Bookings', style: theme.textTheme.titleMedium)),
-                            TextButton.icon(
-                              onPressed: _addBooking,
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Add'),
                             ),
-                          ],
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        if (_bookingTodos.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                                'No bookings yet — they appear here once your itinerary has places.'),
-                          )
-                        else
-                          for (final todo in _bookingTodos)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: BookingTodoCard(
-                                todo: todo,
-                                onBookedChanged: (v) => _setBooked(todo, v),
-                                onOpen: _openCallbackFor(todo),
-                                openLabelOverride:
-                                    _flightLegs.containsKey(todo.todoKey)
-                                        ? 'Find flights'
-                                        : null,
-                                onDelete:
-                                    todo.auto ? null : () => _deleteTodo(todo),
-                              ),
-                            ),
                       ],
                     ),
     );
@@ -1461,4 +1501,44 @@ class _TimeOfDayChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A fixed-height header that scrolls with the page until it reaches the top,
+/// then stays pinned. Used for the trip map and, stacked beneath it, the
+/// itinerary filter bar. The opaque [backgroundColor] fill keeps list content
+/// from peeking through the [padding] (side margins and gaps) while pinned.
+class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double height;
+  final Color backgroundColor;
+  final EdgeInsetsGeometry padding;
+  final Widget child;
+
+  const _PinnedHeaderDelegate({
+    required this.height,
+    required this.backgroundColor,
+    required this.padding,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+          BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      Container(
+        color: backgroundColor,
+        padding: padding,
+        child: child,
+      );
+
+  @override
+  bool shouldRebuild(_PinnedHeaderDelegate oldDelegate) =>
+      oldDelegate.child != child ||
+      oldDelegate.height != height ||
+      oldDelegate.backgroundColor != backgroundColor ||
+      oldDelegate.padding != padding;
 }
