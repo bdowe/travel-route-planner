@@ -137,6 +137,23 @@ class _ChatPanelState extends ConsumerState<ChatPanel> {
                             }).toList(),
                           ),
                         ),
+                      if (planState.profileUpdateNote != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Tooltip(
+                              message: planState.profileUpdateNote!.isEmpty
+                                  ? 'Travel profile updated'
+                                  : planState.profileUpdateNote!,
+                              child: Chip(
+                                avatar: Icon(Icons.check_circle_outline,
+                                    size: 16, color: theme.colorScheme.primary),
+                                label: const Text('Noted — travel profile updated'),
+                              ),
+                            ),
+                          ),
+                        ),
                       if (planState.flightOffers != null && planState.flightOffers!.isNotEmpty)
                         _FlightOptions(
                           routeLabel: planState.flightRouteLabel,

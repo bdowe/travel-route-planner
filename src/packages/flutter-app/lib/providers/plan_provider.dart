@@ -19,6 +19,10 @@ class PlanState {
   final String? flightRouteLabel;
   final String? error;
 
+  /// Short excerpt of profile notes the agent just saved (server
+  /// `profile_updated` event); shown as a transient "Noted" chip in the chat.
+  final String? profileUpdateNote;
+
   /// Bumped each time a trip-bound session patches the trip in place
   /// (server `trip_updated` event); listeners reload the trip when it grows.
   final int tripUpdateCount;
@@ -34,6 +38,7 @@ class PlanState {
     this.flightOffers,
     this.flightRouteLabel,
     this.error,
+    this.profileUpdateNote,
     this.tripUpdateCount = 0,
   });
 
@@ -48,6 +53,7 @@ class PlanState {
     Object? flightOffers = _sentinel,
     Object? flightRouteLabel = _sentinel,
     Object? error = _sentinel,
+    Object? profileUpdateNote = _sentinel,
     int? tripUpdateCount,
   }) {
     return PlanState(
@@ -63,6 +69,8 @@ class PlanState {
       flightOffers: flightOffers == _sentinel ? this.flightOffers : flightOffers as List<FlightOffer>?,
       flightRouteLabel: flightRouteLabel == _sentinel ? this.flightRouteLabel : flightRouteLabel as String?,
       error: error == _sentinel ? this.error : error as String?,
+      profileUpdateNote:
+          profileUpdateNote == _sentinel ? this.profileUpdateNote : profileUpdateNote as String?,
       tripUpdateCount: tripUpdateCount ?? this.tripUpdateCount,
     );
   }
@@ -126,6 +134,7 @@ class PlanNotifier extends StateNotifier<PlanState> {
       flightOffers: null,
       flightRouteLabel: null,
       error: null,
+      profileUpdateNote: null,
     );
 
     final history = updatedMessages
@@ -163,6 +172,10 @@ class PlanNotifier extends StateNotifier<PlanState> {
 
             case 'trip_updated':
             state = state.copyWith(tripUpdateCount: state.tripUpdateCount + 1);
+
+          case 'profile_updated':
+            state = state.copyWith(
+                profileUpdateNote: event.data['notes_preview'] as String? ?? '');
 
           case 'flights':
             final raw = event.data['offers'] as List<dynamic>? ?? [];

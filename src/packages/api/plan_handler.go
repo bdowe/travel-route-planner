@@ -127,7 +127,7 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	savePrefsTool := anthropic.ToolParam{
 		Name:        "save_preferences",
-		Description: anthropic.String("Save what you learn about the traveler's preferences so future trips are personalized. Call this when the user reveals a budget level, trip pace, interests, or which airport they fly from. Only include fields you actually learned."),
+		Description: anthropic.String("Save what you learn about the traveler so future trips are personalized. Call this when the user reveals a budget level, trip pace, interests, which airport they fly from, or any other durable fact about how they travel. Only include fields you actually learned."),
 		InputSchema: anthropic.ToolInputSchemaParam{
 			Properties: map[string]any{
 				"budget": map[string]any{
@@ -148,6 +148,10 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				"home_airport": map[string]any{
 					"type":        "string",
 					"description": "The traveler's home/departure airport as an IATA code, e.g. BOS — save it when they mention where they usually fly from",
+				},
+				"profile_notes": map[string]any{
+					"type":        "string",
+					"description": "The COMPLETE updated traveler profile as short bullet lines — your current notes (shown in the system prompt) merged with the new fact, de-duplicated, max ~15 lines. Never send only the new fact; always send the full rewritten profile.",
 				},
 			},
 		},
@@ -260,13 +264,17 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 
 	placesService := NewGooglePlacesService()
 	ctx := r.Context()
+	distilled := false
 
 	// Fold the signed-in traveler's saved preferences into the system prompt.
+	// The profile-keeping instruction applies even before any row exists, so
+	// the first durable fact a traveler reveals gets captured.
 	systemPrompt := basePrompt
 	if authed {
 		if prefs, err := store.New(dbPool).GetPreferences(ctx, uid); err == nil {
 			systemPrompt = personalizedSystemPrompt(basePrompt, &prefs)
 		}
+		systemPrompt += profileNotesInstruction
 	}
 	if boundTripID != nil {
 		systemPrompt += "\n\nYou are refining an existing saved trip in place. The conversation's first message describes the current itinerary and which section the traveler wants to change. Apply changes by calling update_itinerary_section with the targeted scope and the COMPLETE updated list of places for that section — include unchanged places with their existing coordinates, city, day, time_of_day and category tags so they aren't lost. Use search_places to find real coordinates for any new place before adding it. Only change the section the traveler asked about unless they broaden the request."
@@ -358,6 +366,13 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 						log.Printf("failed to persist trip: %v", err)
 					} else {
 						donePayload["trip_id"] = tripID
+						// Distill what this conversation revealed about the traveler
+						// in the background — it must never delay or fail the trip.
+						// context.Background(): the request ctx dies with the handler.
+						if !distilled {
+							distilled = true
+							go distillTravelerProfile(context.Background(), client, uid, req.Messages)
+						}
 					}
 				}
 				sendSSE(w, "done", donePayload)
@@ -391,10 +406,11 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 
 			case "save_preferences":
 				var in struct {
-					Budget      *string  `json:"budget"`
-					Pace        *string  `json:"pace"`
-					Interests   []string `json:"interests"`
-					HomeAirport *string  `json:"home_airport"`
+					Budget       *string  `json:"budget"`
+					Pace         *string  `json:"pace"`
+					Interests    []string `json:"interests"`
+					HomeAirport  *string  `json:"home_airport"`
+					ProfileNotes *string  `json:"profile_notes"`
 				}
 				json.Unmarshal(variant.Input, &in)
 
@@ -405,12 +421,39 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				if in.Interests != nil {
 					interestsArg = normalizeInterests(in.Interests)
 				}
+				notes := normalizeNotes(in.ProfileNotes)
+				if notes != nil && *notes == "" {
+					// The agent can never wipe notes; only the user (PUT) can clear.
+					notes = nil
+				}
 				_, err := store.New(dbPool).UpsertPreferences(ctx, store.UpsertPreferencesParams{
-					UserID: uid, Budget: budget, Pace: pace, Interests: interestsArg, HomeAirport: homeAirport,
+					UserID: uid, Budget: budget, Pace: pace, Interests: interestsArg, HomeAirport: homeAirport, ProfileNotes: notes,
 				})
 				msg := "Preferences saved."
 				if err != nil {
 					msg = fmt.Sprintf("Could not save preferences: %v", err)
+				} else {
+					var changed []string
+					if budget != nil {
+						changed = append(changed, "budget")
+					}
+					if pace != nil {
+						changed = append(changed, "pace")
+					}
+					if interestsArg != nil {
+						changed = append(changed, "interests")
+					}
+					if homeAirport != nil {
+						changed = append(changed, "home_airport")
+					}
+					if notes != nil {
+						changed = append(changed, "profile_notes")
+					}
+					if len(changed) > 0 {
+						sendSSE(w, "profile_updated", map[string]any{
+							"fields": changed, "notes_preview": notesPreview(notes),
+						})
+					}
 				}
 				sendSSE(w, "tool_result", map[string]string{"name": "save_preferences"})
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, msg, err != nil))
@@ -573,9 +616,13 @@ func summarizeOffers(origin, dest string, offers []FlightOffer) string {
 	return b.String()
 }
 
-// personalizedSystemPrompt appends the traveler's saved preferences to the base
-// prompt, omitting any fields that are unset. Returns base unchanged when there
-// are no preferences to add.
+// profileNotesInstruction is the standing profile-keeping rule appended to every
+// authenticated session's system prompt, whether or not notes exist yet.
+const profileNotesInstruction = "\n\nWhen you learn something durable about this traveler — travel companions, dietary needs, accommodation style, accessibility needs, likes or dislikes — call save_preferences with profile_notes set to the COMPLETE updated profile: your current notes merged with the new fact, de-duplicated, as short bullet lines (max ~15). Never send only the new fact. Don't store one-off trip details or sensitive information (health, religion, politics) unless the traveler explicitly asks you to remember it."
+
+// personalizedSystemPrompt appends the traveler's saved preferences and
+// AI-maintained profile notes to the base prompt, omitting any fields that are
+// unset. Returns base unchanged when there is nothing to add.
 func personalizedSystemPrompt(base string, p *store.TravelerPreference) string {
 	if p == nil {
 		return base
@@ -597,9 +644,26 @@ func personalizedSystemPrompt(base string, p *store.TravelerPreference) string {
 			*p.HomeAirport + ") and state the assumption (e.g. 'flying from " + *p.HomeAirport +
 			"'); only use a different origin if the trip clearly starts elsewhere or they say so."
 	}
-	if len(parts) == 0 {
-		return base
+	out := base
+	if len(parts) > 0 {
+		out += "\n\nTraveler preferences — " + strings.Join(parts, "; ") +
+			". Tailor your suggestions accordingly." + homeNote
 	}
-	return base + "\n\nTraveler preferences — " + strings.Join(parts, "; ") +
-		". Tailor your suggestions accordingly." + homeNote
+	if p.ProfileNotes != nil && strings.TrimSpace(*p.ProfileNotes) != "" {
+		out += "\n\nTraveler profile notes (maintained by you):\n" + strings.TrimSpace(*p.ProfileNotes)
+	}
+	return out
+}
+
+// notesPreview returns a short excerpt of saved notes for the profile_updated
+// SSE event; empty when no notes were part of the save.
+func notesPreview(notes *string) string {
+	if notes == nil {
+		return ""
+	}
+	r := []rune(strings.TrimSpace(*notes))
+	if len(r) > 80 {
+		return string(r[:80]) + "…"
+	}
+	return string(r)
 }
