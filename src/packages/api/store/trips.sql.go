@@ -107,6 +107,15 @@ func (q *Queries) CreateTrip(ctx context.Context, arg CreateTripParams) (Trip, e
 	return i, err
 }
 
+const deleteItineraryItemsByTrip = `-- name: DeleteItineraryItemsByTrip :exec
+DELETE FROM itinerary_items WHERE trip_id = $1
+`
+
+func (q *Queries) DeleteItineraryItemsByTrip(ctx context.Context, tripID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteItineraryItemsByTrip, tripID)
+	return err
+}
+
 const deleteTrip = `-- name: DeleteTrip :execrows
 DELETE FROM trips t
 WHERE t.user_id = $1
@@ -348,6 +357,33 @@ func (q *Queries) ListTripsByOwner(ctx context.Context, userID uuid.UUID) ([]Tri
 		return nil, err
 	}
 	return items, nil
+}
+
+const shiftItineraryItemPositions = `-- name: ShiftItineraryItemPositions :exec
+UPDATE itinerary_items SET position = position + 1
+WHERE trip_id = $1 AND position >= $2
+`
+
+type ShiftItineraryItemPositionsParams struct {
+	TripID   uuid.UUID `json:"trip_id"`
+	Position int32     `json:"position"`
+}
+
+// Opens a gap at the given position for an insert; the (trip_id, position)
+// index is non-unique, so the unordered update cannot collide.
+func (q *Queries) ShiftItineraryItemPositions(ctx context.Context, arg ShiftItineraryItemPositionsParams) error {
+	_, err := q.db.Exec(ctx, shiftItineraryItemPositions, arg.TripID, arg.Position)
+	return err
+}
+
+const touchTrip = `-- name: TouchTrip :exec
+UPDATE trips SET updated_at = now() WHERE id = $1
+`
+
+// Itinerary-item writes don't touch the trips row, so bump updated_at by hand.
+func (q *Queries) TouchTrip(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, touchTrip, id)
+	return err
 }
 
 const updateTrip = `-- name: UpdateTrip :one

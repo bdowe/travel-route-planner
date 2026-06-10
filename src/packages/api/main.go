@@ -664,6 +664,7 @@ func main() {
 	api.Handle("/trips/{id}", authMiddleware(http.HandlerFunc(patchTripHandler))).Methods("PATCH")
 	api.Handle("/trips/{id}", authMiddleware(http.HandlerFunc(deleteTripHandler))).Methods("DELETE")
 	api.Handle("/trips/{id}/refine", authMiddleware(http.HandlerFunc(refineTripHandler))).Methods("POST")
+	api.Handle("/trips/{id}/items", authMiddleware(http.HandlerFunc(addItineraryItemHandler))).Methods("POST")
 	api.Handle("/preferences", authMiddleware(http.HandlerFunc(getPreferencesHandler))).Methods("GET")
 	api.Handle("/preferences", authMiddleware(http.HandlerFunc(putPreferencesHandler))).Methods("PUT")
 	api.HandleFunc("/accommodation-links", accommodationLinksHandler).Methods("GET")
@@ -710,6 +711,7 @@ func main() {
 	log.Printf("  GET/PUT /api/v1/preferences      - Traveler preferences (auth)")
 	log.Printf("  GET  /api/v1/accommodation-links - Airbnb/Booking browse links")
 	log.Printf("  POST/DELETE /api/v1/trips/{id}/accommodations - Trip stays (auth)")
+	log.Printf("  POST /api/v1/trips/{id}/items   - Add itinerary item (auth)")
 	log.Printf("  GET  /api/v1/transport-links     - Google Flights/Kayak/Rome2Rio browse links")
 	log.Printf("  POST/DELETE /api/v1/trips/{id}/segments - Trip travel segments (auth)")
 

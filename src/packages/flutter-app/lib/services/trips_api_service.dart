@@ -85,6 +85,20 @@ class TripsApiService {
     throw Exception('Failed to update trip (${res.statusCode})');
   }
 
+  /// Manually adds one itinerary item; the server slots it at the end of its
+  /// chosen day. Returns the full updated trip (items reloaded, in order).
+  Future<Trip> addItineraryItem(String tripId, Map<String, dynamic> body) async {
+    final res = await apiClient.httpClient.post(
+      Uri.parse('${apiClient.baseUrl}/trips/$tripId/items'),
+      headers: _headers(json: true),
+      body: jsonEncode(body),
+    );
+    if (res.statusCode == 201) {
+      return Trip.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to add place (${res.statusCode})');
+  }
+
   Future<void> deleteTrip(String id) async {
     final res = await apiClient.httpClient
         .delete(Uri.parse('${apiClient.baseUrl}/trips/$id'), headers: _headers());

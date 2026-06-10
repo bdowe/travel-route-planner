@@ -12,6 +12,7 @@ import (
 
 	anthropic "github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/google/uuid"
 
 	"travel-route-planner/store"
 )
@@ -19,6 +20,10 @@ import (
 type PlanRequest struct {
 	Messages []PlanChatMessage `json:"messages"`
 	ChatID   string            `json:"chat_id"`
+	// TripID binds the session to an existing saved trip: the agent then refines
+	// that trip in place (update_itinerary_section) and can never create a new
+	// trip version. Requires an authenticated owner.
+	TripID string `json:"trip_id"`
 }
 
 type PlanChatMessage struct {
@@ -60,6 +65,23 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 	// preference-writing tool; signed-in sessions get both.
 	uid, authed := userIDFromRequest(r)
 
+	// A trip-bound session must verifiably own the trip before anything streams;
+	// failing closed here guarantees a refine panel can never fall back to the
+	// version-creating create_itinerary flow.
+	var boundTripID *uuid.UUID
+	if strings.TrimSpace(req.TripID) != "" {
+		tid, err := uuid.Parse(req.TripID)
+		if err != nil || !authed {
+			sendSSE(w, "error", map[string]string{"message": "sign in to refine this trip"})
+			return
+		}
+		if _, err := store.New(dbPool).GetTripByIDAndOwner(r.Context(), store.GetTripByIDAndOwnerParams{ID: tid, UserID: uid}); err != nil {
+			sendSSE(w, "error", map[string]string{"message": "trip not found"})
+			return
+		}
+		boundTripID = &tid
+	}
+
 	searchTool := anthropic.ToolParam{
 		Name:        "search_places",
 		Description: anthropic.String("Search for travel destinations, attractions, restaurants, or points of interest by name or description."),
@@ -81,39 +103,7 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				"locations": map[string]any{
 					"type":        "array",
 					"description": "Ordered list of locations to visit",
-					"items": map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"name":     map[string]any{"type": "string"},
-							"place_id": map[string]any{"type": "string"},
-							"address":  map[string]any{"type": "string"},
-							"city": map[string]any{
-								"type":        "string",
-								"description": "The city/town the place is physically located in — use the actual municipality, not the nearest major city (e.g. 'Versailles', not 'Paris'). Used to group the itinerary by city.",
-							},
-							"day_trip_from": map[string]any{
-								"type":        "string",
-								"description": "If this place is a day trip from the city the traveler is staying in (a nearby town visited and returned from the same day, e.g. Versailles from Paris), set this to that hub city's name. Leave unset for places in the city you're staying in.",
-							},
-							"latitude":  map[string]any{"type": "number"},
-							"longitude": map[string]any{"type": "number"},
-							"category": map[string]any{
-								"type":        "string",
-								"enum":        []string{"attraction", "restaurant"},
-								"description": "What kind of place this is — 'attraction' for sights/activities, 'restaurant' for places to eat.",
-							},
-							"time_of_day": map[string]any{
-								"type":        "string",
-								"enum":        []string{"morning", "afternoon", "evening"},
-								"description": "Which part of the day to do this — spread a day's places sensibly (sights/activities across morning–afternoon, meals at their natural times).",
-							},
-							"day": map[string]any{
-								"type":        "integer",
-								"description": "The trip day this place belongs to, starting at 1 and increasing chronologically across the whole trip; all places on the same day share the same number (e.g. days 1–3 in Paris, then day 4 onward in Rome). Combined with time_of_day this makes each day read as a sequential schedule.",
-							},
-						},
-						"required": []string{"name", "latitude", "longitude"},
-					},
+					"items":       itineraryLocationSchema,
 				},
 				"title": map[string]any{
 					"type":        "string",
@@ -211,12 +201,46 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	updateSectionTool := anthropic.ToolParam{
+		Name:        "update_itinerary_section",
+		Description: anthropic.String("Replace one section of the traveler's saved itinerary in place. Pass the COMPLETE updated list of places for the targeted section, in visit order — places you omit are removed from that section. Places outside the section are untouched. Use scope 'day' for a single trip day, 'city' for one city/hub and its day trips, or 'trip' for the whole itinerary."),
+		InputSchema: anthropic.ToolInputSchemaParam{
+			Properties: map[string]any{
+				"scope": map[string]any{
+					"type":        "string",
+					"enum":        []string{"day", "city", "trip"},
+					"description": "Which slice of the itinerary to replace.",
+				},
+				"day": map[string]any{
+					"type":        "integer",
+					"description": "Required when scope is 'day': the 1-based trip day being replaced.",
+				},
+				"city": map[string]any{
+					"type":        "string",
+					"description": "Required when scope is 'city' (the hub city whose items are replaced); optional with scope 'day' to disambiguate when day numbers repeat across cities.",
+				},
+				"items": map[string]any{
+					"type":        "array",
+					"description": "The full replacement list for the section, in visit order. Include unchanged places with their existing coordinates and tags so they aren't lost.",
+					"items":       itineraryLocationSchema,
+				},
+			},
+			Required: []string{"scope", "items"},
+		},
+	}
+
 	tools := []anthropic.ToolUnionParam{
 		{OfTool: &searchTool},
-		{OfTool: &createTool},
 		{OfTool: &suggestStaysTool},
 		{OfTool: &suggestTransportTool},
 		{OfTool: &searchFlightsTool},
+	}
+	// Trip-bound sessions get the in-place section tool instead of
+	// create_itinerary, so a refinement can never spawn a new trip version.
+	if boundTripID != nil {
+		tools = append(tools, anthropic.ToolUnionParam{OfTool: &updateSectionTool})
+	} else {
+		tools = append(tools, anthropic.ToolUnionParam{OfTool: &createTool})
 	}
 	if authed {
 		tools = append(tools, anthropic.ToolUnionParam{OfTool: &savePrefsTool})
@@ -243,6 +267,9 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 		if prefs, err := store.New(dbPool).GetPreferences(ctx, uid); err == nil {
 			systemPrompt = personalizedSystemPrompt(basePrompt, &prefs)
 		}
+	}
+	if boundTripID != nil {
+		systemPrompt += "\n\nYou are refining an existing saved trip in place. The conversation's first message describes the current itinerary and which section the traveler wants to change. Apply changes by calling update_itinerary_section with the targeted scope and the COMPLETE updated list of places for that section — include unchanged places with their existing coordinates, city, day, time_of_day and category tags so they aren't lost. Use search_places to find real coordinates for any new place before adding it. Only change the section the traveler asked about unless they broaden the request."
 	}
 
 	for {
@@ -335,6 +362,32 @@ func planHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				sendSSE(w, "done", donePayload)
 				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, "Itinerary created successfully.", false))
+
+			case "update_itinerary_section":
+				var in struct {
+					Scope string           `json:"scope"`
+					Day   *int             `json:"day"`
+					City  string           `json:"city"`
+					Items []map[string]any `json:"items"`
+				}
+				json.Unmarshal(variant.Input, &in)
+
+				msg := "Section updated — the traveler's trip page has refreshed."
+				var err error
+				if boundTripID == nil {
+					err = fmt.Errorf("no trip is bound to this session")
+					msg = "This session is not bound to a saved trip; update_itinerary_section is unavailable."
+				} else {
+					// Same in-block walking-distance cleanup create_itinerary gets.
+					in.Items = reorderItineraryByDistance(in.Items)
+					if err = replaceTripSection(ctx, *boundTripID, sectionSelector{Scope: in.Scope, Day: in.Day, City: in.City}, in.Items); err != nil {
+						msg = fmt.Sprintf("Could not update the section: %v", err)
+					} else {
+						sendSSE(w, "trip_updated", map[string]string{"trip_id": boundTripID.String()})
+					}
+				}
+				sendSSE(w, "tool_result", map[string]string{"name": "update_itinerary_section"})
+				toolResults = append(toolResults, anthropic.NewToolResultBlock(variant.ID, msg, err != nil))
 
 			case "save_preferences":
 				var in struct {

@@ -18,6 +18,7 @@ class PlanService {
     List<Map<String, String>> messages, {
     String? bearerToken,
     String? chatId,
+    String? tripId,
   }) async* {
     final request = http.Request('POST', Uri.parse('$baseUrl/plan'));
     request.headers['Content-Type'] = 'application/json';
@@ -27,6 +28,7 @@ class PlanService {
     request.body = jsonEncode({
       'messages': messages,
       if (chatId != null) 'chat_id': chatId,
+      if (tripId != null) 'trip_id': tripId,
     });
 
     final response = await request.send();
