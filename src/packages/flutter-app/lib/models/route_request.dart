@@ -19,12 +19,18 @@ class RouteRequest {
   @JsonKey(name: 'start_date')
   final String? startDate;
 
+  /// When true, the API keeps the supplied location order and only computes
+  /// per-leg travel timings (no nearest-neighbor / 2-opt reordering).
+  @JsonKey(name: 'preserve_order')
+  final bool preserveOrder;
+
   const RouteRequest({
     required this.locations,
     this.startIndex,
     required this.returnToStart,
     this.startTime,
     this.startDate,
+    this.preserveOrder = false,
   });
 
   factory RouteRequest.fromJson(Map<String, dynamic> json) =>
@@ -38,6 +44,7 @@ class RouteRequest {
     bool? returnToStart,
     String? startTime,
     String? startDate,
+    bool? preserveOrder,
   }) {
     return RouteRequest(
       locations: locations ?? this.locations,
@@ -45,12 +52,13 @@ class RouteRequest {
       returnToStart: returnToStart ?? this.returnToStart,
       startTime: startTime ?? this.startTime,
       startDate: startDate ?? this.startDate,
+      preserveOrder: preserveOrder ?? this.preserveOrder,
     );
   }
 
   @override
   String toString() {
-    return 'RouteRequest(locations: ${locations.length} locations, startIndex: $startIndex, returnToStart: $returnToStart, startTime: $startTime, startDate: $startDate)';
+    return 'RouteRequest(locations: ${locations.length} locations, startIndex: $startIndex, returnToStart: $returnToStart, startTime: $startTime, startDate: $startDate, preserveOrder: $preserveOrder)';
   }
 
   @override
@@ -61,7 +69,8 @@ class RouteRequest {
         other.startIndex == startIndex &&
         other.returnToStart == returnToStart &&
         other.startTime == startTime &&
-        other.startDate == startDate;
+        other.startDate == startDate &&
+        other.preserveOrder == preserveOrder;
   }
 
   @override
@@ -70,6 +79,7 @@ class RouteRequest {
         startIndex.hashCode ^
         returnToStart.hashCode ^
         startTime.hashCode ^
-        startDate.hashCode;
+        startDate.hashCode ^
+        preserveOrder.hashCode;
   }
 }

@@ -6,9 +6,13 @@ import '../models/trip.dart';
 import '../models/itinerary_item.dart';
 import '../models/accommodation.dart';
 import '../models/booking_todo.dart';
+import '../models/location.dart';
+import '../models/location_timing.dart';
+import '../models/route_request.dart';
 import '../providers/trips_provider.dart';
 import '../providers/booking_todos_provider.dart';
 import '../providers/preferences_provider.dart';
+import '../providers/api_client_provider.dart';
 import '../widgets/booking_todo_card.dart';
 import '../widgets/trip_map.dart';
 import 'agent_screen.dart';
@@ -39,6 +43,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   String? _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
   // todo_key -> flight leg, so a transport booking item can open Find Flights prefilled.
   Map<String, ({String origin, String destination, String? date})> _flightLegs = {};
+  // Per-leg travel timings keyed by the source item's position (the leg leaving
+  // that item, to the next item in itinerary order). Empty until computed and on
+  // any failure — travel times are an enhancement and never block the itinerary.
+  Map<int, LocationTiming> _travelByPos = {};
 
   /// Itinerary items matching the active category filter, used by both the map
   /// and the list so they stay in sync.
@@ -74,6 +82,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       _homeAirport = ref.read(preferencesProvider).prefs?.homeAirport;
       if (mounted && (trip.items ?? const []).isNotEmpty) {
         await _syncBookingTodos(trip);
+        await _computeTravelTimes(trip);
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -92,6 +101,46 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       if (mounted) setState(() => _bookingTodos = todos);
     } catch (_) {
       // Non-fatal: keep whatever booking todos came with the trip.
+    }
+  }
+
+  /// Computes per-leg travel times for the itinerary in its existing display
+  /// order by calling /optimize-route in preserve-order mode (no reordering).
+  /// Results are keyed by the source item's position; failures leave the map
+  /// empty so the itinerary still renders.
+  Future<void> _computeTravelTimes(Trip trip) async {
+    final items = trip.items ?? const <ItineraryItem>[];
+    final withCoords =
+        items.where((i) => i.latitude != 0 || i.longitude != 0).length;
+    if (withCoords < 2) return;
+    try {
+      final locations = [
+        for (final it in items)
+          Location(
+            id: it.id,
+            name: it.name,
+            placeId: it.placeId,
+            address: it.address,
+            latitude: it.latitude,
+            longitude: it.longitude,
+            category: it.category,
+          ),
+      ];
+      final resp = await ref.read(apiClientProvider).optimizeRoute(
+            RouteRequest(
+              locations: locations,
+              returnToStart: false,
+              preserveOrder: true,
+            ),
+          );
+      final timings = resp.locationTimings;
+      final map = <int, LocationTiming>{};
+      for (var i = 0; i < items.length && i < timings.length; i++) {
+        map[items[i].position] = timings[i];
+      }
+      if (mounted) setState(() => _travelByPos = map);
+    } catch (_) {
+      // Non-fatal: leave travel times empty.
     }
   }
 
@@ -454,7 +503,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       if (day != null) {
         final dayKey = '$cityKey#$day';
         final collapsed = _collapsedDays.contains(dayKey);
-        widgets.add(_daySubHeader(day, tripStart, theme, collapsed, () {
+        widgets.add(_daySubHeader(day, tripStart, theme, collapsed, _runTravelMin(run), () {
           setState(() {
             if (collapsed) {
               _collapsedDays.remove(dayKey);
@@ -473,40 +522,129 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
 
   /// Batches consecutive day-trip places (by town) under an indented
   /// "Day trip · <town>" sub-header so nearby towns read as excursions from the
-  /// hub city rather than separate stops.
+  /// hub city rather than separate stops. Inserts a within-city travel-time
+  /// connector between adjacent tiles of the same indent run.
   List<Widget> _buildDayTripWidgets(List<ItineraryItem> items, ThemeData theme) {
     final widgets = <Widget>[];
+    ItineraryItem? prev;
+    void addTile(ItineraryItem it, double indent) {
+      if (prev != null) {
+        final connector = _travelConnector(prev!, it, indent, theme);
+        if (connector != null) widgets.add(connector);
+      }
+      widgets.add(_itemTile(it, indent, theme));
+      prev = it;
+    }
+
     var i = 0;
     while (i < items.length) {
       final dt = items[i].dayTripFrom?.trim();
       if (dt != null && dt.isNotEmpty) {
         final town = _cityOf(items[i]) ?? 'Day trip';
         widgets.add(_dayTripSubHeader(town, theme));
+        prev = null; // don't draw a connector across the sub-header
         while (i < items.length) {
           final it = items[i];
           final d = it.dayTripFrom?.trim();
           if (d != null && d.isNotEmpty && _cityOf(it) == town) {
-            widgets.add(_itemTile(it, 32, theme));
+            addTile(it, 32);
             i++;
           } else {
             break;
           }
         }
+        prev = null; // leaving the day-trip batch
       } else {
-        widgets.add(_itemTile(items[i], 12, theme));
+        addTile(items[i], 12);
         i++;
       }
     }
     return widgets;
   }
 
+  /// A small "↓ 12 min · 4.3 km" row shown between two consecutive itinerary
+  /// tiles, but only for within-city hops (same hub, truly adjacent in the
+  /// itinerary order). Returns null when it shouldn't render — including while a
+  /// category filter is active, since filtered tiles aren't globally adjacent.
+  Widget? _travelConnector(
+      ItineraryItem from, ItineraryItem to, double indentLeft, ThemeData theme) {
+    if (_itemFilter != 'all') return null;
+    if (to.position != from.position + 1) return null;
+    if (_hubOf(from) != _hubOf(to)) return null;
+    final timing = _travelByPos[from.position];
+    if (timing == null || timing.travelToNextMin <= 0) return null;
+
+    final km = timing.travelToNextKm;
+    final dist = km > 0 ? ' · ${km.toStringAsFixed(1)} km' : '';
+    final muted = theme.colorScheme.onSurfaceVariant;
+    final icon = km > 0 && km <= 1.2
+        ? Icons.directions_walk
+        : Icons.directions_car_outlined;
+    return Padding(
+      padding: EdgeInsets.only(left: indentLeft + 28, top: 2, bottom: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: muted),
+          const SizedBox(width: 6),
+          Text(
+            '${_fmtTravel(timing.travelToNextMin)}$dist',
+            style: theme.textTheme.bodySmall?.copyWith(color: muted),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Total within-city travel time (minutes) across the consecutive legs of a
+  /// day's run. Zero while a category filter is active (legs aren't adjacent).
+  int _runTravelMin(List<ItineraryItem> run) {
+    if (_itemFilter != 'all') return 0;
+    var total = 0;
+    for (var k = 0; k < run.length - 1; k++) {
+      final a = run[k];
+      final b = run[k + 1];
+      if (b.position == a.position + 1 && _hubOf(a) == _hubOf(b)) {
+        total += _travelByPos[a.position]?.travelToNextMin ?? 0;
+      }
+    }
+    return total;
+  }
+
+  /// Travel-time labels for the trip map, keyed by the source item's position:
+  /// one entry per within-city leg (same hub, adjacent in itinerary order).
+  /// Empty while a category filter is active (legs aren't globally adjacent).
+  Map<int, String> _segmentLabels() {
+    final trip = _trip;
+    if (_itemFilter != 'all' || trip == null) return const {};
+    final items = trip.items ?? const <ItineraryItem>[];
+    final byPos = {for (final it in items) it.position: it};
+    final out = <int, String>{};
+    for (final it in items) {
+      final next = byPos[it.position + 1];
+      if (next == null || _hubOf(it) != _hubOf(next)) continue;
+      final t = _travelByPos[it.position];
+      if (t == null || t.travelToNextMin <= 0) continue;
+      out[it.position] = _fmtTravel(t.travelToNextMin);
+    }
+    return out;
+  }
+
+  /// Formats a travel duration: "45 min", "1h", or "1h 20m".
+  String _fmtTravel(int min) {
+    if (min < 60) return '$min min';
+    final h = min ~/ 60;
+    final m = min % 60;
+    return m == 0 ? '${h}h' : '${h}h ${m}m';
+  }
+
   /// Day section header: shows the calendar date (day N -> startDate + (N-1))
   /// when the trip start is known, otherwise falls back to "Day N".
   Widget _daySubHeader(int day, DateTime? tripStart, ThemeData theme,
-      bool collapsed, VoidCallback onTap) {
+      bool collapsed, int travelMin, VoidCallback onTap) {
     final label = tripStart != null
         ? _fmtDayHeader(tripStart.add(Duration(days: day - 1)))
         : 'Day $day';
+    final muted = theme.colorScheme.onSurfaceVariant;
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -524,6 +662,15 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                 ),
               ),
             ),
+            if (travelMin > 0) ...[
+              Icon(Icons.directions_car_outlined, size: 14, color: muted),
+              const SizedBox(width: 4),
+              Text(
+                '${_fmtTravel(travelMin)} travel',
+                style: theme.textTheme.bodySmall?.copyWith(color: muted),
+              ),
+              const SizedBox(width: 8),
+            ],
             Icon(
               collapsed ? Icons.chevron_right : Icons.expand_more,
               size: 18,
@@ -948,6 +1095,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                               child: TripMap(
                                 items: _filtered(trip),
                                 selectedPosition: _selectedPosition,
+                                segmentLabels: _segmentLabels(),
                                 onPinTap: (pos) {
                                   setState(() => _selectedPosition = pos);
                                   final it = trip.items!.firstWhere((i) => i.position == pos);

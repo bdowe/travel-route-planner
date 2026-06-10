@@ -19,12 +19,16 @@ class LocationTiming {
   @JsonKey(name: 'travel_to_next_minutes', defaultValue: 0)
   final int travelToNextMin;
 
+  @JsonKey(name: 'travel_to_next_km', defaultValue: 0.0)
+  final double travelToNextKm;
+
   const LocationTiming({
     required this.location,
     required this.arrivalTime,
     required this.departureTime,
     required this.visitDurationMin,
     required this.travelToNextMin,
+    this.travelToNextKm = 0.0,
   });
 
   factory LocationTiming.fromJson(Map<String, dynamic> json) =>
@@ -34,7 +38,7 @@ class LocationTiming {
 
   @override
   String toString() {
-    return 'LocationTiming(location: ${location.name}, arrivalTime: $arrivalTime, departureTime: $departureTime, visitDurationMin: $visitDurationMin, travelToNextMin: $travelToNextMin)';
+    return 'LocationTiming(location: ${location.name}, arrivalTime: $arrivalTime, departureTime: $departureTime, visitDurationMin: $visitDurationMin, travelToNextMin: $travelToNextMin, travelToNextKm: $travelToNextKm)';
   }
 
   @override
@@ -45,7 +49,8 @@ class LocationTiming {
         other.arrivalTime == arrivalTime &&
         other.departureTime == departureTime &&
         other.visitDurationMin == visitDurationMin &&
-        other.travelToNextMin == travelToNextMin;
+        other.travelToNextMin == travelToNextMin &&
+        other.travelToNextKm == travelToNextKm;
   }
 
   @override
@@ -54,6 +59,7 @@ class LocationTiming {
         arrivalTime.hashCode ^
         departureTime.hashCode ^
         visitDurationMin.hashCode ^
-        travelToNextMin.hashCode;
+        travelToNextMin.hashCode ^
+        travelToNextKm.hashCode;
   }
 }
