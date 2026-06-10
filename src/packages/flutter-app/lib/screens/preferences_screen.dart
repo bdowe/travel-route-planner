@@ -24,6 +24,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
   final Set<String> _interests = {};
   Airport? _homeAirport;
   final _interestController = TextEditingController();
+  final _notesController = TextEditingController();
   bool _initialized = false;
 
   @override
@@ -41,6 +42,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           if (home != null && home.isNotEmpty) {
             _homeAirport = Airport(iataCode: home, name: home);
           }
+          _notesController.text = prefs.profileNotes ?? '';
           _initialized = true;
         });
       } else if (mounted) {
@@ -52,6 +54,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
   @override
   void dispose() {
     _interestController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -69,6 +72,8 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           pace: _pace,
           interests: _interests.toList(),
           homeAirport: _homeAirport?.iataCode,
+          // Always send the field's text: an emptied field clears the notes.
+          profileNotes: _notesController.text.trim(),
         );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +162,25 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
                   icon: Icons.home,
                   selected: _homeAirport,
                   onSelected: (a) => setState(() => _homeAirport = a),
+                ),
+                const SizedBox(height: 24),
+                Text('Profile notes', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  'Your AI agent keeps these notes as it learns about you. Edit or clear them anytime.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _notesController,
+                  maxLines: 6,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    hintText: 'Nothing noted yet — the agent adds to this as you plan trips.',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 32),
                 FilledButton(

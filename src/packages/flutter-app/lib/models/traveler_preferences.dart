@@ -9,12 +9,15 @@ class TravelerPreferences {
   final List<String> interests;
   @JsonKey(name: 'home_airport')
   final String? homeAirport;
+  @JsonKey(name: 'profile_notes')
+  final String? profileNotes;
 
   const TravelerPreferences({
     this.budget,
     this.pace,
     this.interests = const [],
     this.homeAirport,
+    this.profileNotes,
   });
 
   factory TravelerPreferences.fromJson(Map<String, dynamic> json) =>

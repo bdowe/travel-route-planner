@@ -15,10 +15,11 @@ var allowedBudgets = map[string]bool{"budget": true, "mid": true, "luxury": true
 var allowedPaces = map[string]bool{"relaxed": true, "balanced": true, "packed": true}
 
 type PreferencesResponse struct {
-	Budget      *string  `json:"budget"`
-	Pace        *string  `json:"pace"`
-	Interests   []string `json:"interests"`
-	HomeAirport *string  `json:"home_airport"`
+	Budget       *string  `json:"budget"`
+	Pace         *string  `json:"pace"`
+	Interests    []string `json:"interests"`
+	HomeAirport  *string  `json:"home_airport"`
+	ProfileNotes *string  `json:"profile_notes"`
 }
 
 type PutPreferencesRequest struct {
@@ -27,6 +28,8 @@ type PutPreferencesRequest struct {
 	// Pointer distinguishes omitted (nil -> keep) from cleared ([] -> clear).
 	Interests   *[]string `json:"interests"`
 	HomeAirport *string   `json:"home_airport"`
+	// Pointer distinguishes omitted (nil -> keep) from cleared ("" -> clear).
+	ProfileNotes *string `json:"profile_notes"`
 }
 
 func toPreferencesResponse(p store.TravelerPreference) PreferencesResponse {
@@ -34,7 +37,7 @@ func toPreferencesResponse(p store.TravelerPreference) PreferencesResponse {
 	if interests == nil {
 		interests = []string{}
 	}
-	return PreferencesResponse{Budget: p.Budget, Pace: p.Pace, Interests: interests, HomeAirport: p.HomeAirport}
+	return PreferencesResponse{Budget: p.Budget, Pace: p.Pace, Interests: interests, HomeAirport: p.HomeAirport, ProfileNotes: p.ProfileNotes}
 }
 
 func getPreferencesHandler(w http.ResponseWriter, r *http.Request) {
@@ -92,11 +95,12 @@ func putPreferencesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p, err := store.New(dbPool).UpsertPreferences(r.Context(), store.UpsertPreferencesParams{
-		UserID:      user.ID,
-		Budget:      budget,
-		Pace:        pace,
-		Interests:   interestsArg,
-		HomeAirport: homeAirport,
+		UserID:       user.ID,
+		Budget:       budget,
+		Pace:         pace,
+		Interests:    interestsArg,
+		HomeAirport:  homeAirport,
+		ProfileNotes: normalizeNotes(req.ProfileNotes),
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not save preferences")
@@ -135,6 +139,22 @@ func normalizeAirportCode(v *string) (*string, error) {
 		return nil, errors.New("home_airport must be a 3-letter IATA code")
 	}
 	return &s, nil
+}
+
+const maxProfileNotesLen = 2000
+
+// normalizeNotes trims and caps the AI-maintained profile notes. nil -> nil
+// (omit, keep existing); a provided value — including "" — replaces, so the
+// user can clear notes. Truncation counts runes to avoid splitting characters.
+func normalizeNotes(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	s := strings.TrimSpace(*v)
+	if r := []rune(s); len(r) > maxProfileNotesLen {
+		s = string(r[:maxProfileNotesLen])
+	}
+	return &s
 }
 
 // normalizeInterests trims, drops blanks, and de-duplicates (case-insensitive,
