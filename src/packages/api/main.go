@@ -386,6 +386,121 @@ func placesDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// FlightSearchResponse is the ranked result of a flight search.
+type FlightSearchResponse struct {
+	Offers      []FlightOffer `json:"offers"`
+	BestOfferID string        `json:"best_offer_id,omitempty"`
+	OptimizeFor string        `json:"optimize_for"`
+	Count       int           `json:"count"`
+	Status      string        `json:"status"`
+}
+
+// duffelService is a process-wide singleton reused across requests (the HTTP
+// client and config are shared; auth is a static token).
+var duffelService = NewDuffelService()
+
+// airportsSearchHandler resolves a keyword to airports/cities for autocomplete.
+func airportsSearchHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		http.Error(w, "Missing query parameter 'q'", http.StatusBadRequest)
+		return
+	}
+
+	results, err := duffelService.SearchAirports(r.Context(), query)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to search airports: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"results": results,
+		"status":  "success",
+	})
+}
+
+// flightsSearchHandler searches for flights and returns them ranked by the
+// requested optimization preset (cost | time | balanced).
+func flightsSearchHandler(w http.ResponseWriter, r *http.Request) {
+	var request FlightSearchRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{
+			Message: fmt.Sprintf("Invalid JSON: %v", err),
+			Status:  "error",
+		})
+		return
+	}
+
+	// Validate input
+	writeErr := func(msg string) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(Response{Message: msg, Status: "error"})
+	}
+	if strings.TrimSpace(request.Origin) == "" {
+		writeErr("origin (IATA code) is required")
+		return
+	}
+	if strings.TrimSpace(request.Destination) == "" {
+		writeErr("destination (IATA code) is required")
+		return
+	}
+	if strings.TrimSpace(request.DepartDate) == "" {
+		writeErr("depart_date (YYYY-MM-DD) is required")
+		return
+	}
+	if request.Adults == 0 {
+		request.Adults = 1
+	}
+	if request.Adults < 1 || request.Adults > 9 {
+		writeErr("adults must be between 1 and 9")
+		return
+	}
+
+	validOptimizations := map[string]bool{"cost": true, "time": true, "balanced": true, "": true}
+	if !validOptimizations[strings.ToLower(request.OptimizeFor)] {
+		writeErr("optimize_for must be one of: 'cost', 'time', 'balanced'")
+		return
+	}
+
+	offers, err := duffelService.SearchFlightOffers(r.Context(), request)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(Response{
+			Message: fmt.Sprintf("Failed to search flights: %v", err),
+			Status:  "error",
+		})
+		return
+	}
+
+	ranked := RankFlightOffers(offers, request.OptimizeFor)
+
+	// Attach a per-airline booking link to each offer (airline site when known,
+	// else airline-filtered Google Flights).
+	attachBookingURLs(ranked, request)
+
+	bestID := ""
+	if len(ranked) > 0 {
+		bestID = ranked[0].ID
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(FlightSearchResponse{
+		Offers:      ranked,
+		BestOfferID: bestID,
+		OptimizeFor: normalizeOptimizeFor(request.OptimizeFor),
+		Count:       len(ranked),
+		Status:      "success",
+	})
+}
+
 func airbnbParseHandler(w http.ResponseWriter, r *http.Request) {
 	var req AirbnbParseRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -534,6 +649,8 @@ func main() {
 	api.HandleFunc("/places/search", placesSearchHandler).Methods("GET")
 	api.HandleFunc("/places/autocomplete", placesAutocompleteHandler).Methods("GET")
 	api.HandleFunc("/places/details", placesDetailsHandler).Methods("GET")
+	api.HandleFunc("/flights/search", flightsSearchHandler).Methods("POST")
+	api.HandleFunc("/flights/airports", airportsSearchHandler).Methods("GET")
 	api.HandleFunc("/plan", planHandler).Methods("POST")
 	api.HandleFunc("/airbnb/parse", airbnbParseHandler).Methods("POST")
 	api.HandleFunc("/airbnb/debug", airbnbDebugHandler).Methods("POST")
@@ -582,6 +699,8 @@ func main() {
 	log.Printf("  GET  /api/v1/places/search      - Search Places")
 	log.Printf("  GET  /api/v1/places/autocomplete - Place Autocomplete")
 	log.Printf("  GET  /api/v1/places/details     - Place Details")
+	log.Printf("  POST /api/v1/flights/search     - Ranked Flight Search (Duffel)")
+	log.Printf("  GET  /api/v1/flights/airports   - Airport/City Autocomplete (Duffel)")
 	log.Printf("  POST /api/v1/auth/register      - Register")
 	log.Printf("  POST /api/v1/auth/login         - Login")
 	log.Printf("  POST /api/v1/auth/logout        - Logout (auth)")

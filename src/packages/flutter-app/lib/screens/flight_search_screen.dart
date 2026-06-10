@@ -1,0 +1,358 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/airport.dart';
+import '../models/flight_search_request.dart';
+import '../providers/flights_provider.dart';
+import '../providers/preferences_provider.dart';
+import '../widgets/airport_field.dart';
+import '../widgets/flight_offer_card.dart';
+import '../widgets/gradient_app_bar.dart';
+
+/// Standalone flight search: pick origin/destination/date/passengers and a
+/// ranking preset, then browse offers ranked by the Duffel-backed API.
+///
+/// Optional prefill ([prefillOrigin]/[prefillDestination] may be an IATA code or
+/// a city name; [prefillDepartDate] is YYYY-MM-DD) lets callers (e.g. a trip's
+/// flight booking item) open the screen ready to search. Prefill takes
+/// precedence over the saved home-airport origin seed.
+class FlightSearchScreen extends ConsumerStatefulWidget {
+  final String? prefillOrigin;
+  final String? prefillDestination;
+  final String? prefillDepartDate;
+
+  const FlightSearchScreen({
+    super.key,
+    this.prefillOrigin,
+    this.prefillDestination,
+    this.prefillDepartDate,
+  });
+
+  @override
+  ConsumerState<FlightSearchScreen> createState() => _FlightSearchScreenState();
+}
+
+class _FlightSearchScreenState extends ConsumerState<FlightSearchScreen> {
+  Airport? _origin;
+  Airport? _destination;
+  DateTime? _departDate;
+  int _adults = 1;
+  String _optimizeFor = 'balanced';
+
+  static const _presets = {
+    'cost': 'Cheapest',
+    'time': 'Fastest',
+    'balanced': 'Balanced',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _seedInitial());
+  }
+
+  /// Seeds the form from explicit prefill (origin/destination/date) when given,
+  /// otherwise falls back to the saved home airport for the origin. Both are
+  /// still editable.
+  Future<void> _seedInitial() async {
+    final w = widget;
+    final date = w.prefillDepartDate == null
+        ? null
+        : DateTime.tryParse(w.prefillDepartDate!);
+    if (date != null && _departDate == null) {
+      setState(() => _departDate = date);
+    }
+
+    if (w.prefillOrigin != null && w.prefillOrigin!.isNotEmpty) {
+      final a = await _resolve(w.prefillOrigin!);
+      if (a != null && _origin == null && mounted) setState(() => _origin = a);
+    } else {
+      // No explicit origin → fall back to the traveler's home airport.
+      await ref.read(preferencesProvider.notifier).load();
+      final code = ref.read(preferencesProvider).prefs?.homeAirport;
+      if (code != null && code.isNotEmpty && _origin == null && mounted) {
+        setState(() => _origin = Airport(iataCode: code, name: code));
+      }
+    }
+
+    if (w.prefillDestination != null && w.prefillDestination!.isNotEmpty) {
+      final a = await _resolve(w.prefillDestination!);
+      if (a != null && _destination == null && mounted) {
+        setState(() => _destination = a);
+      }
+    }
+
+    // Fully prefilled (origin + destination + date all given and resolved) →
+    // run the search immediately so the caller lands on results.
+    if (mounted &&
+        w.prefillOrigin != null &&
+        w.prefillDestination != null &&
+        w.prefillDepartDate != null &&
+        _canSearch) {
+      _search();
+    }
+  }
+
+  /// Resolves an IATA code or city name to an [Airport]. A 3-letter alphabetic
+  /// input is used as-is; otherwise the Duffel airport search resolves it (first
+  /// match). Mirrors the backend's resolveIATA.
+  Future<Airport?> _resolve(String query) async {
+    final q = query.trim();
+    final isCode = q.length == 3 && RegExp(r'^[A-Za-z]{3}$').hasMatch(q);
+    if (isCode) return Airport(iataCode: q.toUpperCase(), name: q.toUpperCase());
+    try {
+      final results =
+          await ref.read(flightsApiServiceProvider).searchAirports(q);
+      return results.isNotEmpty ? results.first : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get _canSearch =>
+      _origin != null && _destination != null && _departDate != null;
+
+  String _fmtDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _departDate ?? now.add(const Duration(days: 14)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+    );
+    if (picked != null) setState(() => _departDate = picked);
+  }
+
+  void _search() {
+    if (!_canSearch) return;
+    ref.read(flightsProvider.notifier).search(FlightSearchRequest(
+          origin: _origin!.iataCode,
+          destination: _destination!.iataCode,
+          departDate: _fmtDate(_departDate!),
+          adults: _adults,
+          optimizeFor: _optimizeFor,
+        ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(flightsProvider);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: const GradientAppBar(title: Text('Find Flights')),
+      body: Column(
+        children: [
+          // Search form
+          Container(
+            color: theme.colorScheme.surface,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                AirportField(
+                  label: 'From',
+                  icon: Icons.flight_takeoff,
+                  selected: _origin,
+                  onSelected: (a) => setState(() => _origin = a),
+                ),
+                const SizedBox(height: 12),
+                AirportField(
+                  label: 'To',
+                  icon: Icons.flight_land,
+                  selected: _destination,
+                  onSelected: (a) => setState(() => _destination = a),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _pickDate,
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(_departDate == null
+                            ? 'Departure date'
+                            : _fmtDate(_departDate!)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _PassengerStepper(
+                      adults: _adults,
+                      onChanged: (v) => setState(() => _adults = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SegmentedButton<String>(
+                  segments: _presets.entries
+                      .map((e) => ButtonSegment(
+                            value: e.key,
+                            label: Text(e.value),
+                          ))
+                      .toList(),
+                  selected: {_optimizeFor},
+                  onSelectionChanged: (s) =>
+                      setState(() => _optimizeFor = s.first),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed:
+                        _canSearch && !state.loading ? _search : null,
+                    icon: state.loading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.search),
+                    label: Text(state.loading ? 'Searching…' : 'Search Flights'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          // Results
+          Expanded(child: _Results(state: state)),
+        ],
+      ),
+    );
+  }
+}
+
+class _Results extends StatelessWidget {
+  final FlightsState state;
+  const _Results({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    if (state.error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline,
+                  size: 48, color: theme.colorScheme.error),
+              const SizedBox(height: 12),
+              Text('Could not load flights',
+                  style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(
+                state.error!,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!state.hasSearched) {
+      return _Hint(
+        icon: Icons.flight,
+        text: 'Choose an origin, destination, and date to find flights.',
+      );
+    }
+
+    if (state.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (state.offers.isEmpty) {
+      return const _Hint(
+        icon: Icons.search_off,
+        text: 'No flights found for this route and date.',
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: state.offers.length,
+      itemBuilder: (context, i) {
+        final offer = state.offers[i];
+        return FlightOfferCard(
+          offer: offer,
+          isBest: offer.id == state.bestOfferId,
+        );
+      },
+    );
+  }
+}
+
+class _Hint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Hint({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: color),
+            const SizedBox(height: 12),
+            Text(text, textAlign: TextAlign.center,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PassengerStepper extends StatelessWidget {
+  final int adults;
+  final ValueChanged<int> onChanged;
+  const _PassengerStepper({required this.adults, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.remove, size: 18),
+            onPressed: adults > 1 ? () => onChanged(adults - 1) : null,
+            visualDensity: VisualDensity.compact,
+          ),
+          Text('$adults',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.add, size: 18),
+            onPressed: adults < 9 ? () => onChanged(adults + 1) : null,
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
