@@ -48,6 +48,19 @@ SELECT * FROM trips WHERE id = $1 AND user_id = $2;
 -- name: GetItineraryItemsByTrip :many
 SELECT * FROM itinerary_items WHERE trip_id = $1 ORDER BY position ASC;
 
+-- name: ShiftItineraryItemPositions :exec
+-- Opens a gap at the given position for an insert; the (trip_id, position)
+-- index is non-unique, so the unordered update cannot collide.
+UPDATE itinerary_items SET position = position + 1
+WHERE trip_id = $1 AND position >= $2;
+
+-- name: DeleteItineraryItemsByTrip :exec
+DELETE FROM itinerary_items WHERE trip_id = $1;
+
+-- name: TouchTrip :exec
+-- Itinerary-item writes don't touch the trips row, so bump updated_at by hand.
+UPDATE trips SET updated_at = now() WHERE id = $1;
+
 -- name: UpdateTrip :one
 UPDATE trips
 SET title      = COALESCE(sqlc.narg('title'), title),

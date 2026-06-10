@@ -15,9 +15,9 @@ func TestOptimizeRoutePreserveOrder(t *testing.T) {
 	req := RouteRequest{
 		PreserveOrder: true,
 		Locations: []Location{
-			{ID: "a", Name: "A", Latitude: f64(40.7128), Longitude: f64(-74.0060)}, // NYC
+			{ID: "a", Name: "A", Latitude: f64(40.7128), Longitude: f64(-74.0060)},  // NYC
 			{ID: "b", Name: "B", Latitude: f64(34.0522), Longitude: f64(-118.2437)}, // LA (far)
-			{ID: "c", Name: "C", Latitude: f64(40.7138), Longitude: f64(-74.0050)}, // ~NYC
+			{ID: "c", Name: "C", Latitude: f64(40.7138), Longitude: f64(-74.0050)},  // ~NYC
 		},
 	}
 

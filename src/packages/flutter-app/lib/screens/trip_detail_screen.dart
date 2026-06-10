@@ -14,9 +14,11 @@ import '../providers/recent_trip_provider.dart';
 import '../providers/booking_todos_provider.dart';
 import '../providers/preferences_provider.dart';
 import '../providers/api_client_provider.dart';
+import '../providers/plan_provider.dart';
+import '../widgets/add_itinerary_item_dialog.dart';
 import '../widgets/booking_todo_card.dart';
 import '../widgets/trip_map.dart';
-import 'agent_screen.dart';
+import '../widgets/trip_refine_panel.dart';
 import 'flight_search_screen.dart';
 
 class TripDetailScreen extends ConsumerStatefulWidget {
@@ -30,8 +32,11 @@ class TripDetailScreen extends ConsumerStatefulWidget {
 class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   Trip? _trip;
   bool _loading = true;
-  bool _refining = false;
   String? _error;
+  // In-page AI refinement panel (side dock on wide layouts, bottom sheet on
+  // narrow ones); null target while closed.
+  bool _panelOpen = false;
+  RefineTarget? _refineTarget;
   String _itemFilter = 'all'; // 'all' | 'attraction' | 'restaurant'
   int? _selectedPosition; // position of the place focused via a map pin / list tap
   List<BookingTodo> _bookingTodos = [];
@@ -123,8 +128,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
             name: it.name,
             placeId: it.placeId,
             address: it.address,
-            latitude: it.latitude,
-            longitude: it.longitude,
+            // (0,0) is the "no location" sentinel (e.g. manually added places
+            // without a Places match) — send null so the optimizer skips the
+            // coordinate rather than routing via the Gulf of Guinea.
+            latitude: it.latitude == 0 && it.longitude == 0 ? null : it.latitude,
+            longitude: it.latitude == 0 && it.longitude == 0 ? null : it.longitude,
             category: it.category,
           ),
       ];
@@ -252,6 +260,16 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     if (added == true) await _load();
   }
 
+  Future<void> _addPlace() async {
+    final trip = _trip;
+    if (trip == null) return;
+    final added = await showDialog<bool>(
+      context: context,
+      builder: (_) => AddItineraryItemDialog(trip: trip),
+    );
+    if (added == true) await _load();
+  }
+
   Future<void> _patch({String? title, String? startDate, String? endDate, String? status}) async {
     try {
       final updated = await ref.read(tripsApiServiceProvider).patchTrip(
@@ -301,40 +319,93 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     }
   }
 
-  Future<void> _refine(Trip trip) async {
+  /// Opens the in-page refinement panel on [target], seeding a fresh session
+  /// with the section's current contents. The session is bound to this trip
+  /// server-side, so changes patch the trip in place (no new versions).
+  void _openRefine(Trip trip, RefineTarget target) {
     final items = trip.items ?? [];
     if (items.isEmpty) {
       _showSnack('Add some places before refining with AI.');
       return;
     }
-    setState(() => _refining = true);
-    try {
-      final chatId = await ref.read(tripsApiServiceProvider).startRefineSession(trip.id);
-      if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => AgentScreen(chatId: chatId, initialMessage: _buildRefineSeed(trip)),
-        ),
-      );
-    } catch (e) {
-      _showSnack('Could not start refine session: $e');
-    } finally {
-      if (mounted) setState(() => _refining = false);
+    ref
+        .read(tripRefineProvider(widget.tripId).notifier)
+        .beginSectionRefinement(_buildSectionSeed(trip, target));
+    setState(() {
+      _panelOpen = true;
+      _refineTarget = target;
+    });
+  }
+
+  /// Whether an item falls inside the refinement target (client-side mirror of
+  /// the server's section selector, using the same hub grouping as the list).
+  bool _inTarget(ItineraryItem it, RefineTarget t) {
+    switch (t.scope) {
+      case 'day':
+        if (it.day != t.day) return false;
+        return t.city == null ||
+            (_hubOf(it)?.toLowerCase() == t.city!.toLowerCase());
+      case 'city':
+        return _hubOf(it)?.toLowerCase() == t.city!.toLowerCase();
+      default:
+        return true;
     }
   }
 
-  /// Builds the seed message that hands the agent the trip's current itinerary,
-  /// including coordinates so it can keep unchanged places without re-searching.
-  String _buildRefineSeed(Trip trip) {
-    final b = StringBuffer("Here's my current itinerary for \"${trip.title}\":\n");
+  /// One compact line per item with everything the agent must echo back to
+  /// keep the item unchanged (coordinates and all tags).
+  String _seedLine(ItineraryItem it) {
+    final b = StringBuffer('- ${it.name}');
+    if (it.category != null) b.write(' [${it.category}]');
+    b.write(' (${it.latitude}, ${it.longitude})');
+    final city = it.city?.trim();
+    if (city != null && city.isNotEmpty) b.write(', city: $city');
+    final hub = it.dayTripFrom?.trim();
+    if (hub != null && hub.isNotEmpty) b.write(', day trip from $hub');
+    if (it.day != null) b.write(', day ${it.day}');
+    if (it.timeOfDay != null) b.write(', ${it.timeOfDay}');
+    return b.toString();
+  }
+
+  /// Builds the panel's seed message: trip context, the target section's items
+  /// in full detail, and explicit instructions to patch only that section via
+  /// update_itinerary_section.
+  String _buildSectionSeed(Trip trip, RefineTarget t) {
     final items = trip.items ?? [];
-    for (var i = 0; i < items.length; i++) {
-      final it = items[i];
-      final category = it.category != null ? ' [${it.category}]' : '';
-      b.writeln('${i + 1}. ${it.name}$category (${it.latitude}, ${it.longitude})');
+    final b = StringBuffer('I want to refine my saved trip "${_displayTitle(trip)}"');
+    if (trip.startDate != null && trip.endDate != null) {
+      b.write(' (${trip.startDate} to ${trip.endDate})');
     }
-    b.write("\nI'd like to refine this trip. When we're done, call create_itinerary "
-        "with the full updated list of places.");
+    b.writeln('.');
+
+    final inTarget = items.where((it) => _inTarget(it, t)).toList();
+    if (t.scope == 'trip') {
+      b.writeln('\nThe full itinerary:');
+    } else {
+      // A one-line digest of the rest of the trip so the agent has context
+      // without treating it as editable.
+      b.writeln('\nFor context, the rest of the trip (do not change these): '
+          '${items.where((it) => !_inTarget(it, t)).map((it) => it.name).join(', ')}.');
+      b.writeln('\nThe section to refine — ${t.label}:');
+    }
+    for (final it in inTarget) {
+      b.writeln(_seedLine(it));
+    }
+
+    b.write('\nOnly change this section unless I broaden the request. When you '
+        'apply a change, call update_itinerary_section with ');
+    switch (t.scope) {
+      case 'day':
+        b.write("scope='day', day=${t.day}");
+        if (t.city != null) b.write(", city='${t.city}'");
+      case 'city':
+        b.write("scope='city', city='${t.city}'");
+      default:
+        b.write("scope='trip'");
+    }
+    b.write(' and the COMPLETE updated list for the section, keeping unchanged '
+        'places exactly as listed above (same coordinates and tags). '
+        'Start by asking what I want to change.');
     return b.toString();
   }
 
@@ -514,6 +585,15 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
               _collapsedDays.add(dayKey);
             }
           });
+        }, () {
+          final trip = _trip;
+          if (trip == null) return;
+          // 'Other places' is a fallback label, not a real hub — omit the city
+          // qualifier so the server matches on the day alone.
+          _openRefine(
+              trip,
+              RefineTarget.day(day,
+                  city: cityKey == 'Other places' ? null : cityKey));
         }));
         if (!collapsed) widgets.addAll(_buildDayTripWidgets(run, theme));
       } else {
@@ -643,7 +723,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// Day section header: shows the calendar date (day N -> startDate + (N-1))
   /// when the trip start is known, otherwise falls back to "Day N".
   Widget _daySubHeader(int day, DateTime? tripStart, ThemeData theme,
-      bool collapsed, int travelMin, VoidCallback onTap) {
+      bool collapsed, int travelMin, VoidCallback onTap, VoidCallback onRefine) {
     final label = tripStart != null
         ? _fmtDayHeader(tripStart.add(Duration(days: day - 1)))
         : 'Day $day';
@@ -674,6 +754,13 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
               ),
               const SizedBox(width: 8),
             ],
+            IconButton(
+              icon: const Icon(Icons.auto_awesome, size: 16),
+              tooltip: 'Refine this day',
+              visualDensity: VisualDensity.compact,
+              color: theme.colorScheme.primary,
+              onPressed: onRefine,
+            ),
             Icon(
               collapsed ? Icons.chevron_right : Icons.expand_more,
               size: 18,
@@ -992,15 +1079,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.tonalIcon(
-                onPressed: _refining ? null : () => _refine(trip),
-                icon: _refining
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome),
-                label: Text(_refining ? 'Opening…' : 'Refine with AI'),
+                onPressed: () => _openRefine(trip, const RefineTarget.trip()),
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('Refine with AI'),
               ),
             ),
             if (overview != null) ...[
@@ -1073,8 +1154,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                 )
               : trip == null
                   ? const SizedBox.shrink()
-                  : CustomScrollView(
-                      slivers: [
+                  : LayoutBuilder(builder: (context, constraints) {
+                      final scrollView = CustomScrollView(
+                        slivers: [
                         SliverPadding(
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                           sliver: SliverToBoxAdapter(
@@ -1116,10 +1198,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                         SliverPersistentHeader(
                           pinned: true,
                           delegate: _PinnedHeaderDelegate(
-                            // title (24) + gap (8) + chip row (48) + bottom
-                            // padding (8); title-only when there are no items.
+                            // title row (36) + gap (8) + chip row (48) + bottom
+                            // padding (8); title-row-only when there are no items.
                             height:
-                                (trip.items ?? const []).isNotEmpty ? 92 : 40,
+                                (trip.items ?? const []).isNotEmpty ? 100 : 48,
                             backgroundColor: theme.scaffoldBackgroundColor,
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                             // Align fills the header's full extent so the child's
@@ -1132,8 +1214,27 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('Itinerary',
-                                      style: theme.textTheme.titleMedium),
+                                  SizedBox(
+                                    height: 36,
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text('Itinerary',
+                                              style:
+                                                  theme.textTheme.titleMedium),
+                                        ),
+                                        TextButton.icon(
+                                          onPressed: _addPlace,
+                                          style: TextButton.styleFrom(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                          icon: const Icon(Icons.add, size: 18),
+                                          label: const Text('Add place'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                   if ((trip.items ?? const []).isNotEmpty) ...[
                                     const SizedBox(height: 8),
                                     Wrap(
@@ -1229,6 +1330,24 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                                                         .colorScheme.primary),
                                                           ),
                                                         ],
+                                                        // 'Other places' has no hub the
+                                                        // section tool can target.
+                                                        if (group.label != 'Other places')
+                                                          IconButton(
+                                                            icon: const Icon(
+                                                                Icons.auto_awesome,
+                                                                size: 16),
+                                                            tooltip:
+                                                                'Refine ${group.label}',
+                                                            visualDensity:
+                                                                VisualDensity.compact,
+                                                            color: theme
+                                                                .colorScheme.primary,
+                                                            onPressed: () => _openRefine(
+                                                                trip,
+                                                                RefineTarget.city(
+                                                                    group.label)),
+                                                          ),
                                                         const SizedBox(width: 4),
                                                         Icon(
                                                           cityCollapsed
@@ -1295,7 +1414,75 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    );
+
+                      if (!_panelOpen || _refineTarget == null) {
+                        return scrollView;
+                      }
+                      final panel = TripRefinePanel(
+                        tripId: widget.tripId,
+                        target: _refineTarget!,
+                        onClose: () => setState(() => _panelOpen = false),
+                        onTripUpdated: _load,
+                      );
+                      if (constraints.maxWidth >= 900) {
+                        // Wide: dock the chat beside the itinerary.
+                        return Row(
+                          children: [
+                            Expanded(child: scrollView),
+                            const VerticalDivider(width: 1),
+                            SizedBox(width: 400, child: panel),
+                          ],
+                        );
+                      }
+                      // Narrow: collapsible bottom sheet over the page; bottom
+                      // inset keeps the input above the keyboard.
+                      return Stack(
+                        children: [
+                          scrollView,
+                          DraggableScrollableSheet(
+                            initialChildSize: 0.45,
+                            minChildSize: 0.15,
+                            maxChildSize: 0.92,
+                            snap: true,
+                            builder: (context, scrollController) => Material(
+                              elevation: 8,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(16)),
+                              clipBehavior: Clip.antiAlias,
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                    bottom:
+                                        MediaQuery.of(context).viewInsets.bottom),
+                                child: Column(
+                                  children: [
+                                    // Drag handle (also a scrollable so the
+                                    // sheet responds to drags at its header).
+                                    SingleChildScrollView(
+                                      controller: scrollController,
+                                      child: Center(
+                                        child: Container(
+                                          width: 36,
+                                          height: 4,
+                                          margin: const EdgeInsets.symmetric(
+                                              vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.outlineVariant,
+                                            borderRadius:
+                                                BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(child: panel),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }),
     );
   }
 

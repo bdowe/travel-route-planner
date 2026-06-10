@@ -19,6 +19,10 @@ class PlanState {
   final String? flightRouteLabel;
   final String? error;
 
+  /// Bumped each time a trip-bound session patches the trip in place
+  /// (server `trip_updated` event); listeners reload the trip when it grows.
+  final int tripUpdateCount;
+
   const PlanState({
     this.messages = const [],
     this.isStreaming = false,
@@ -30,6 +34,7 @@ class PlanState {
     this.flightOffers,
     this.flightRouteLabel,
     this.error,
+    this.tripUpdateCount = 0,
   });
 
   PlanState copyWith({
@@ -43,6 +48,7 @@ class PlanState {
     Object? flightOffers = _sentinel,
     Object? flightRouteLabel = _sentinel,
     Object? error = _sentinel,
+    int? tripUpdateCount,
   }) {
     return PlanState(
       messages: messages ?? this.messages,
@@ -57,6 +63,7 @@ class PlanState {
       flightOffers: flightOffers == _sentinel ? this.flightOffers : flightOffers as List<FlightOffer>?,
       flightRouteLabel: flightRouteLabel == _sentinel ? this.flightRouteLabel : flightRouteLabel as String?,
       error: error == _sentinel ? this.error : error as String?,
+      tripUpdateCount: tripUpdateCount ?? this.tripUpdateCount,
     );
   }
 }
@@ -67,12 +74,16 @@ class PlanNotifier extends StateNotifier<PlanState> {
   final PlanService _service;
   final ApiClient _apiClient;
 
+  /// When set, every request carries trip_id and the server refines that saved
+  /// trip in place (update_itinerary_section) instead of creating new versions.
+  final String? tripId;
+
   // Stable id for the current conversation. Every create_itinerary in this chat
   // is stamped with it server-side so refinements collapse to one trip in My
   // Trips instead of spawning duplicate drafts. Regenerated on reset().
   String? _chatId;
 
-  PlanNotifier(this._service, this._apiClient) : super(const PlanState());
+  PlanNotifier(this._service, this._apiClient, {this.tripId}) : super(const PlanState());
 
   // 0x7fffffff (not 1 << 32) because on the web target `1 << 32` overflows JS's
   // 32-bit bitwise ops to 0, and Random.nextInt(0) throws RangeError.
@@ -124,7 +135,8 @@ class PlanNotifier extends StateNotifier<PlanState> {
     final textBuffer = StringBuffer();
 
     try {
-      await for (final event in _service.streamPlan(history, bearerToken: _apiClient.authToken, chatId: _chatId)) {
+      await for (final event in _service.streamPlan(history,
+          bearerToken: _apiClient.authToken, chatId: _chatId, tripId: tripId)) {
         switch (event.type) {
           case 'text_delta':
             textBuffer.write(event.data['text'] as String? ?? '');
@@ -148,6 +160,9 @@ class PlanNotifier extends StateNotifier<PlanState> {
               completedSummary: summary,
               savedTripId: event.data['trip_id'] as String?,
             );
+
+            case 'trip_updated':
+            state = state.copyWith(tripUpdateCount: state.tripUpdateCount + 1);
 
           case 'flights':
             final raw = event.data['offers'] as List<dynamic>? ?? [];
@@ -211,9 +226,28 @@ class PlanNotifier extends StateNotifier<PlanState> {
     _chatId = chatId;
     sendMessage(seedMessage);
   }
+
+  /// Start (or restart) an in-place section refinement on the bound trip:
+  /// clears any prior conversation and sends the seed describing the targeted
+  /// section. Requires [tripId]; the server patches that trip directly, so no
+  /// chat-group binding is needed.
+  void beginSectionRefinement(String seedMessage) {
+    reset();
+    sendMessage(seedMessage);
+  }
 }
 
 final planProvider = StateNotifierProvider<PlanNotifier, PlanState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   return PlanNotifier(PlanService(apiClient.baseUrl), apiClient);
+});
+
+/// Per-trip refinement session for the trip-detail panel, kept separate from
+/// the global [planProvider] so panel chats never clobber the Agent tab's
+/// conversation. keepAlive preserves the conversation across panel
+/// close/reopen while the app runs; it is reset explicitly when a new
+/// refinement target is chosen.
+final tripRefineProvider = StateNotifierProvider.family<PlanNotifier, PlanState, String>((ref, tripId) {
+  final apiClient = ref.watch(apiClientProvider);
+  return PlanNotifier(PlanService(apiClient.baseUrl), apiClient, tripId: tripId);
 });

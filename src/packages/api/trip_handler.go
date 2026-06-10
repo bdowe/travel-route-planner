@@ -168,63 +168,11 @@ func persistTrip(ctx context.Context, userID uuid.UUID, chatID, title, summary, 
 
 	maxDay := 1
 	for i, loc := range locations {
-		name, _ := loc["name"].(string)
-		lat, _ := loc["latitude"].(float64)
-		lng, _ := loc["longitude"].(float64)
-		var placeID, address, city, dayTripFrom, category, timeOfDay *string
-		var day *int32
-		if s, ok := loc["place_id"].(string); ok && s != "" {
-			placeID = &s
+		params := itemParamsFromLocation(trip.ID, int32(i), loc)
+		if params.Day != nil && int(*params.Day) > maxDay {
+			maxDay = int(*params.Day)
 		}
-		if s, ok := loc["address"].(string); ok && s != "" {
-			address = &s
-		}
-		if s, ok := loc["city"].(string); ok {
-			c := strings.TrimSpace(s)
-			if c != "" {
-				city = &c
-			}
-		}
-		if s, ok := loc["day_trip_from"].(string); ok {
-			d := strings.TrimSpace(s)
-			if d != "" {
-				dayTripFrom = &d
-			}
-		}
-		if s, ok := loc["category"].(string); ok {
-			c := strings.ToLower(strings.TrimSpace(s))
-			if allowedItemCategories[c] {
-				category = &c
-			}
-		}
-		if s, ok := loc["time_of_day"].(string); ok {
-			t := strings.ToLower(strings.TrimSpace(s))
-			if allowedTimesOfDay[t] {
-				timeOfDay = &t
-			}
-		}
-		// JSON numbers decode as float64; keep only sensible 1-based day numbers.
-		if v, ok := loc["day"].(float64); ok && v >= 1 {
-			d := int32(v)
-			day = &d
-			if int(d) > maxDay {
-				maxDay = int(d)
-			}
-		}
-		if _, err := q.CreateItineraryItem(ctx, store.CreateItineraryItemParams{
-			TripID:      trip.ID,
-			Position:    int32(i),
-			Name:        name,
-			PlaceID:     placeID,
-			Address:     address,
-			Latitude:    lat,
-			Longitude:   lng,
-			Category:    category,
-			TimeOfDay:   timeOfDay,
-			City:        city,
-			DayTripFrom: dayTripFrom,
-			Day:         day,
-		}); err != nil {
+		if _, err := q.CreateItineraryItem(ctx, params); err != nil {
 			return "", err
 		}
 	}
