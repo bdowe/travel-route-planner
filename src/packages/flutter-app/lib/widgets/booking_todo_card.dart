@@ -9,12 +9,17 @@ class BookingTodoCard extends StatelessWidget {
   final VoidCallback? onOpen;
   final VoidCallback? onDelete;
 
+  /// Overrides the open-button text (e.g. 'Find flights' when the action opens
+  /// the in-app flight search instead of an external provider link).
+  final String? openLabelOverride;
+
   const BookingTodoCard({
     super.key,
     required this.todo,
     required this.onBookedChanged,
     this.onOpen,
     this.onDelete,
+    this.openLabelOverride,
   });
 
   IconData get _icon {
@@ -29,6 +34,7 @@ class BookingTodoCard extends StatelessWidget {
   }
 
   String get _openLabel {
+    if (openLabelOverride != null) return openLabelOverride!;
     switch (todo.provider) {
       case 'airbnb':
         return 'Open in Airbnb';

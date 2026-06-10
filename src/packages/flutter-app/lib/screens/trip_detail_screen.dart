@@ -8,9 +8,11 @@ import '../models/accommodation.dart';
 import '../models/booking_todo.dart';
 import '../providers/trips_provider.dart';
 import '../providers/booking_todos_provider.dart';
+import '../providers/preferences_provider.dart';
 import '../widgets/booking_todo_card.dart';
 import '../widgets/trip_map.dart';
 import 'agent_screen.dart';
+import 'flight_search_screen.dart';
 
 class TripDetailScreen extends ConsumerStatefulWidget {
   final String tripId;
@@ -34,6 +36,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   final Set<String> _collapsedCities = {};
   final Set<String> _collapsedDays = {};
   final GlobalKey _mapKey = GlobalKey(); // for scrolling the trip map into view on tap
+  String? _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
+  // todo_key -> flight leg, so a transport booking item can open Find Flights prefilled.
+  Map<String, ({String origin, String destination, String? date})> _flightLegs = {};
 
   /// Itinerary items matching the active category filter, used by both the map
   /// and the list so they stay in sync.
@@ -63,6 +68,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
           _bookingTodos = trip.bookingTodos ?? [];
         });
       }
+      // Load the home airport so the booking checklist can derive the outbound
+      // and return flights (no-op / null for anonymous sessions).
+      await ref.read(preferencesProvider.notifier).load();
+      _homeAirport = ref.read(preferencesProvider).prefs?.homeAirport;
       if (mounted && (trip.items ?? const []).isNotEmpty) {
         await _syncBookingTodos(trip);
       }
@@ -91,7 +100,37 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   List<Map<String, dynamic>> _deriveTodos(Trip trip) {
     final ranges = _locationGroupRanges(trip);
     final todos = <Map<String, dynamic>>[];
+    final legs = <String, ({String origin, String destination, String? date})>{};
     var pos = 0;
+    final home = _homeAirport;
+    final hasHome = home != null && home.isNotEmpty && ranges.isNotEmpty;
+
+    // Adds a transport (flight) todo and records its leg so the booking item can
+    // open Find Flights prefilled.
+    void addFlight(String origin, String destination, DateTime? when) {
+      final date = when == null ? null : _fmt(when);
+      final key =
+          'transport:${origin.toLowerCase()}>>${destination.toLowerCase()}';
+      todos.add({
+        'kind': 'transport',
+        'todo_key': key,
+        'title': '$origin → $destination',
+        if (when != null) 'subtitle': _fmtShortDt(when),
+        'provider': 'google_flights',
+        'position': pos++,
+        'origin': origin,
+        'destination': destination,
+        if (date != null) 'depart_date': date,
+        'passengers': 1,
+      });
+      legs[key] = (origin: origin, destination: destination, date: date);
+    }
+
+    // Outbound: home airport -> first city, on the trip's start date.
+    if (hasHome) {
+      addFlight(home, ranges.first.label, ranges.first.start);
+    }
+
     for (var i = 0; i < ranges.length; i++) {
       final r = ranges[i];
       final label = r.label;
@@ -111,23 +150,16 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         'guests': 1,
       });
       if (i < ranges.length - 1) {
-        final next = ranges[i + 1];
-        final depart = r.end == null ? null : _fmt(r.end!);
-        todos.add({
-          'kind': 'transport',
-          'todo_key':
-              'transport:${label.toLowerCase()}>>${next.label.toLowerCase()}',
-          'title': '$label → ${next.label}',
-          if (r.end != null) 'subtitle': _fmtShortDt(r.end!),
-          'provider': 'google_flights',
-          'position': pos++,
-          'origin': label,
-          'destination': next.label,
-          if (depart != null) 'depart_date': depart,
-          'passengers': 1,
-        });
+        addFlight(label, ranges[i + 1].label, r.end);
       }
     }
+
+    // Return: last city -> home airport, on the trip's end date.
+    if (hasHome) {
+      addFlight(ranges.last.label, home, ranges.last.end);
+    }
+
+    _flightLegs = legs;
     return todos;
   }
 
@@ -1061,9 +1093,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                               child: BookingTodoCard(
                                 todo: todo,
                                 onBookedChanged: (v) => _setBooked(todo, v),
-                                onOpen: todo.searchUrl != null
-                                    ? () => _launch(todo.searchUrl!)
-                                    : null,
+                                onOpen: _openCallbackFor(todo),
+                                openLabelOverride:
+                                    _flightLegs.containsKey(todo.todoKey)
+                                        ? 'Find flights'
+                                        : null,
                                 onDelete:
                                     todo.auto ? null : () => _deleteTodo(todo),
                               ),
@@ -1071,6 +1105,24 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                       ],
                     ),
     );
+  }
+
+  /// The open action for a booking item: a transport item with a known flight
+  /// leg opens the in-app Find Flights screen prefilled; everything else falls
+  /// back to its external provider search link.
+  VoidCallback? _openCallbackFor(BookingTodo todo) {
+    final leg = todo.kind == 'transport' ? _flightLegs[todo.todoKey] : null;
+    if (leg != null) {
+      return () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => FlightSearchScreen(
+              prefillOrigin: leg.origin,
+              prefillDestination: leg.destination,
+              prefillDepartDate: leg.date,
+            ),
+          ));
+    }
+    if (todo.searchUrl != null) return () => _launch(todo.searchUrl!);
+    return null;
   }
 
   Future<void> _launch(String url) async {
