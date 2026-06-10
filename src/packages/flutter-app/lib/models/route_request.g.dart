@@ -14,6 +14,7 @@ RouteRequest _$RouteRequestFromJson(Map<String, dynamic> json) => RouteRequest(
       returnToStart: json['return_to_start'] as bool,
       startTime: json['start_time'] as String?,
       startDate: json['start_date'] as String?,
+      preserveOrder: json['preserve_order'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$RouteRequestToJson(RouteRequest instance) =>
@@ -23,4 +24,5 @@ Map<String, dynamic> _$RouteRequestToJson(RouteRequest instance) =>
       'return_to_start': instance.returnToStart,
       'start_time': instance.startTime,
       'start_date': instance.startDate,
+      'preserve_order': instance.preserveOrder,
     };

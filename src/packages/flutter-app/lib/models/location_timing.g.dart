@@ -13,6 +13,7 @@ LocationTiming _$LocationTimingFromJson(Map<String, dynamic> json) =>
       departureTime: json['departure_time'] as String? ?? '',
       visitDurationMin: (json['visit_duration_minutes'] as num).toInt(),
       travelToNextMin: (json['travel_to_next_minutes'] as num?)?.toInt() ?? 0,
+      travelToNextKm: (json['travel_to_next_km'] as num?)?.toDouble() ?? 0.0,
     );
 
 Map<String, dynamic> _$LocationTimingToJson(LocationTiming instance) =>
@@ -22,4 +23,5 @@ Map<String, dynamic> _$LocationTimingToJson(LocationTiming instance) =>
       'departure_time': instance.departureTime,
       'visit_duration_minutes': instance.visitDurationMin,
       'travel_to_next_minutes': instance.travelToNextMin,
+      'travel_to_next_km': instance.travelToNextKm,
     };

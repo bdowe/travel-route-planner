@@ -39,6 +39,7 @@ type RouteRequest struct {
 	ReturnToStart bool       `json:"return_to_start"`       // Round trip vs one-way
 	StartTime     *string    `json:"start_time,omitempty"`  // Start time in format "15:04" (24-hour) or RFC3339
 	StartDate     *string    `json:"start_date,omitempty"`  // Start date in format "2006-01-02" or full datetime
+	PreserveOrder bool       `json:"preserve_order"`        // Skip NN/2-opt and keep input order; only compute per-leg timings
 }
 
 // LocationTiming represents timing information for a specific location
@@ -48,6 +49,7 @@ type LocationTiming struct {
 	VisitDurationMin int      `json:"visit_duration_minutes"`
 	DepartureTime    string   `json:"departure_time,omitempty"`
 	TravelToNextMin  int      `json:"travel_to_next_minutes"`
+	TravelToNextKm   float64  `json:"travel_to_next_km"`
 }
 
 // RouteResponse represents the optimized route result
@@ -586,18 +588,33 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 		startIndex = *request.StartIndex
 	}
 
-	// Create initial route using nearest neighbor
-	initialRoute := ro.nearestNeighborRoute(startIndex, request.ReturnToStart)
-	originalDistance := ro.calculateRouteDistance(initialRoute, request.ReturnToStart)
+	var optimizedRoute []int
+	var originalDistance, optimizedDistance float64
+	algorithm := "nearest-neighbor + 2-opt"
 
-	// Optimize using 2-opt (limit iterations for performance)
-	maxIterations := 100
-	if len(request.Locations) > 20 {
-		maxIterations = 50 // Reduce iterations for larger problems
+	if request.PreserveOrder {
+		// Keep the caller-supplied order; only compute per-leg timings below.
+		optimizedRoute = make([]int, len(request.Locations))
+		for i := range optimizedRoute {
+			optimizedRoute[i] = i
+		}
+		optimizedDistance = ro.calculateRouteDistance(optimizedRoute, request.ReturnToStart)
+		originalDistance = optimizedDistance
+		algorithm = "preserve-order"
+	} else {
+		// Create initial route using nearest neighbor
+		initialRoute := ro.nearestNeighborRoute(startIndex, request.ReturnToStart)
+		originalDistance = ro.calculateRouteDistance(initialRoute, request.ReturnToStart)
+
+		// Optimize using 2-opt (limit iterations for performance)
+		maxIterations := 100
+		if len(request.Locations) > 20 {
+			maxIterations = 50 // Reduce iterations for larger problems
+		}
+
+		optimizedRoute = ro.optimizeWith2Opt(initialRoute, request.ReturnToStart, maxIterations)
+		optimizedDistance = ro.calculateRouteDistance(optimizedRoute, request.ReturnToStart)
 	}
-
-	optimizedRoute := ro.optimizeWith2Opt(initialRoute, request.ReturnToStart, maxIterations)
-	optimizedDistance := ro.calculateRouteDistance(optimizedRoute, request.ReturnToStart)
 
 	// Convert indices back to locations
 	result := make([]Location, len(optimizedRoute))
@@ -659,21 +676,22 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 
 		// Calculate travel time to next location
 		travelToNext := 0
+		travelToNextKm := 0.0
 		if i < len(result)-1 {
 			// Find indices in original locations array
 			currentIdx := ro.findLocationIndex(location.ID)
 			nextIdx := ro.findLocationIndex(result[i+1].ID)
 			if currentIdx != -1 && nextIdx != -1 {
-				travelDistance := ro.getDistance(currentIdx, nextIdx)
-				travelToNext = int(math.Ceil(travelDistance / 40.0 * 60)) // 40 km/h average
+				travelToNextKm = ro.getDistance(currentIdx, nextIdx)
+				travelToNext = int(math.Ceil(travelToNextKm / 40.0 * 60)) // 40 km/h average
 			}
 		} else if request.ReturnToStart && len(result) > 1 {
 			// Travel time back to start
 			currentIdx := ro.findLocationIndex(location.ID)
 			startIdx := ro.findLocationIndex(result[0].ID)
 			if currentIdx != -1 && startIdx != -1 {
-				travelDistance := ro.getDistance(currentIdx, startIdx)
-				travelToNext = int(math.Ceil(travelDistance / 40.0 * 60))
+				travelToNextKm = ro.getDistance(currentIdx, startIdx)
+				travelToNext = int(math.Ceil(travelToNextKm / 40.0 * 60))
 			}
 		}
 
@@ -683,6 +701,7 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 			VisitDurationMin: visitDuration,
 			DepartureTime:    departureTime,
 			TravelToNextMin:  travelToNext,
+			TravelToNextKm:   math.Round(travelToNextKm*100) / 100,
 		}
 
 		// Update current time for next location (departure time + travel time)
@@ -699,7 +718,7 @@ func (ro *RouteOptimizer) OptimizeRoute(request RouteRequest) RouteResponse {
 		TotalTripTimeMin:   totalTripTime,
 		LocationTimings:    locationTimings,
 		LocationCount:      len(request.Locations),
-		Algorithm:          "nearest-neighbor + 2-opt",
+		Algorithm:          algorithm,
 		OriginalDistance:   math.Round(originalDistance*100) / 100,
 		ImprovementPct:     math.Round(improvementPct*100) / 100,
 		Status:             "success",

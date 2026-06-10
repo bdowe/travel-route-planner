@@ -13,11 +13,16 @@ class TripMap extends StatefulWidget {
   final int? selectedPosition;
   final void Function(int position)? onPinTap;
 
+  /// Label text (e.g. "12 min") for the within-city leg leaving the item at the
+  /// given position. Drawn at the midpoint of that segment. Empty => no labels.
+  final Map<int, String> segmentLabels;
+
   const TripMap({
     super.key,
     required this.items,
     this.selectedPosition,
     this.onPinTap,
+    this.segmentLabels = const {},
   });
 
   @override
@@ -117,6 +122,28 @@ class _TripMapState extends State<TripMap> {
     final points = mapped.map((m) => m.point).toList();
     final selected = _selectedPoint();
 
+    // Travel-time labels at the midpoint of each within-city leg (only between
+    // truly adjacent itinerary stops that are both mapped).
+    final labelMarkers = <Marker>[];
+    for (var k = 0; k < mapped.length - 1; k++) {
+      final a = mapped[k];
+      final b = mapped[k + 1];
+      if (b.item.position != a.item.position + 1) continue;
+      final label = widget.segmentLabels[a.item.position];
+      if (label == null) continue;
+      labelMarkers.add(
+        Marker(
+          point: LatLng(
+            (a.point.latitude + b.point.latitude) / 2,
+            (a.point.longitude + b.point.longitude) / 2,
+          ),
+          width: 70,
+          height: 22,
+          child: _SegmentLabel(text: label),
+        ),
+      );
+    }
+
     // Wheel scroll stays with the page (the map lives inside a ListView);
     // zooming is done via the on-map buttons or touch pinch.
     const interaction = InteractionOptions(
@@ -166,6 +193,7 @@ class _TripMapState extends State<TripMap> {
                   ),
                 ],
               ),
+            if (labelMarkers.isNotEmpty) MarkerLayer(markers: labelMarkers),
             MarkerClusterLayerWidget(
               options: MarkerClusterLayerOptions(
                 maxClusterRadius: 45,
@@ -252,6 +280,37 @@ class _MapButton extends StatelessWidget {
             width: 36,
             height: 36,
             child: Icon(icon, size: 20, color: scheme.onSurface),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small pill showing a leg's travel time, centered on the route line.
+class _SegmentLabel extends StatelessWidget {
+  final String text;
+  const _SegmentLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.clip,
+          style: TextStyle(
+            color: scheme.onSurface,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
