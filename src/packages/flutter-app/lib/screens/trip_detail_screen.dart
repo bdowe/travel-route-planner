@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sliver_tools/sliver_tools.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../models/trip.dart';
@@ -38,16 +39,19 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   bool _panelOpen = false;
   RefineTarget? _refineTarget;
   String _itemFilter = 'all'; // 'all' | 'attraction' | 'restaurant'
-  int? _selectedPosition; // position of the place focused via a map pin / list tap
+  int?
+      _selectedPosition; // position of the place focused via a map pin / list tap
   List<BookingTodo> _bookingTodos = [];
   bool _overviewExpanded = false;
   // Collapsed sets (empty => all expanded). Cities keyed by group label; days
   // keyed by "<city>#<day>" since day numbers repeat across cities.
   final Set<String> _collapsedCities = {};
   final Set<String> _collapsedDays = {};
-  String? _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
+  String?
+      _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
   // todo_key -> flight leg, so a transport booking item can open Find Flights prefilled.
-  Map<String, ({String origin, String destination, String? date})> _flightLegs = {};
+  Map<String, ({String origin, String destination, String? date})> _flightLegs =
+      {};
   // Per-leg travel timings keyed by the source item's position (the leg leaving
   // that item, to the next item in itinerary order). Empty until computed and on
   // any failure — travel times are an enhancement and never block the itinerary.
@@ -74,7 +78,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       _error = null;
     });
     try {
-      final trip = await ref.read(tripsApiServiceProvider).getTrip(widget.tripId);
+      final trip =
+          await ref.read(tripsApiServiceProvider).getTrip(widget.tripId);
       if (mounted) {
         setState(() {
           _trip = trip;
@@ -131,8 +136,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
             // (0,0) is the "no location" sentinel (e.g. manually added places
             // without a Places match) — send null so the optimizer skips the
             // coordinate rather than routing via the Gulf of Guinea.
-            latitude: it.latitude == 0 && it.longitude == 0 ? null : it.latitude,
-            longitude: it.latitude == 0 && it.longitude == 0 ? null : it.longitude,
+            latitude:
+                it.latitude == 0 && it.longitude == 0 ? null : it.latitude,
+            longitude:
+                it.latitude == 0 && it.longitude == 0 ? null : it.longitude,
             category: it.category,
           ),
       ];
@@ -159,7 +166,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   List<Map<String, dynamic>> _deriveTodos(Trip trip) {
     final ranges = _locationGroupRanges(trip);
     final todos = <Map<String, dynamic>>[];
-    final legs = <String, ({String origin, String destination, String? date})>{};
+    final legs =
+        <String, ({String origin, String destination, String? date})>{};
     var pos = 0;
     final home = _homeAirport;
     final hasHome = home != null && home.isNotEmpty && ranges.isNotEmpty;
@@ -228,7 +236,12 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// (user-added `custom:*` todos, stale auto todos). Each todo is claimed at
   /// most once, so repeated city labels still render each booking exactly once.
   ({
-    List<({BookingTodo? arrival, BookingTodo? stay, BookingTodo? departure})> slots,
+    List<
+        ({
+          BookingTodo? arrival,
+          BookingTodo? stay,
+          BookingTodo? departure
+        })> slots,
     List<BookingTodo> residual,
   }) _groupedBookings(List<String> groupLabels) {
     final claimed = <String>{};
@@ -246,8 +259,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     final stays = <BookingTodo?>[];
     for (final label in groupLabels) {
       final l = label.toLowerCase();
-      arrivals.add(claim(
-          (t) => t.kind == 'transport' && t.todoKey.endsWith('>>$l')));
+      arrivals.add(
+          claim((t) => t.kind == 'transport' && t.todoKey.endsWith('>>$l')));
       stays.add(claim((t) => t.todoKey == 'stay:$l'));
     }
     // Claimed after all arrivals so an inter-city leg can't be taken as its
@@ -268,8 +281,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
             departure: i == groupLabels.length - 1 ? departure : null,
           ),
       ],
-      residual:
-          _bookingTodos.where((t) => !claimed.contains(t.id)).toList(),
+      residual: _bookingTodos.where((t) => !claimed.contains(t.id)).toList(),
     );
   }
 
@@ -293,10 +305,12 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
 
   Future<void> _deleteTodo(BookingTodo todo) async {
     try {
-      await ref.read(bookingTodosApiServiceProvider).delete(widget.tripId, todo.id);
+      await ref
+          .read(bookingTodosApiServiceProvider)
+          .delete(widget.tripId, todo.id);
       if (mounted) {
-        setState(() =>
-            _bookingTodos = _bookingTodos.where((t) => t.id != todo.id).toList());
+        setState(() => _bookingTodos =
+            _bookingTodos.where((t) => t.id != todo.id).toList());
       }
     } catch (e) {
       _showSnack('Delete failed: $e');
@@ -321,7 +335,11 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     if (added == true) await _load();
   }
 
-  Future<void> _patch({String? title, String? startDate, String? endDate, String? status}) async {
+  Future<void> _patch(
+      {String? title,
+      String? startDate,
+      String? endDate,
+      String? status}) async {
     try {
       final updated = await ref.read(tripsApiServiceProvider).patchTrip(
             widget.tripId,
@@ -345,7 +363,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         title: const Text('Edit title'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             child: const Text('Save'),
@@ -423,7 +443,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// update_itinerary_section.
   String _buildSectionSeed(Trip trip, RefineTarget t) {
     final items = trip.items ?? [];
-    final b = StringBuffer('I want to refine my saved trip "${_displayTitle(trip)}"');
+    final b =
+        StringBuffer('I want to refine my saved trip "${_displayTitle(trip)}"');
     if (trip.startDate != null && trip.endDate != null) {
       b.write(' (${trip.startDate} to ${trip.endDate})');
     }
@@ -467,9 +488,12 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         title: const Text('Delete trip?'),
         content: const Text('This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -479,7 +503,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     if (confirm == true) {
       try {
         await ref.read(tripsProvider.notifier).deleteTrip(widget.tripId);
-        await ref.read(recentTripProvider.notifier).clearIfMatches(widget.tripId);
+        await ref
+            .read(recentTripProvider.notifier)
+            .clearIfMatches(widget.tripId);
         if (mounted) Navigator.of(context).pop();
       } catch (e) {
         _showSnack('Delete failed: $e');
@@ -569,14 +595,18 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// "Av. ..., 1400-206 Lisboa, Portugal" -> "Lisboa"; a bare "Paris" stays as is.
   String? _cityFromAddress(String? address) {
     if (address == null) return null;
-    final parts =
-        address.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final parts = address
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return null;
     if (parts.length == 1) return parts.first;
     final candidate = parts[parts.length - 2]; // segment before the country
     final tokens = candidate
         .split(RegExp(r'\s+'))
-        .where((t) => !RegExp(r'^[0-9][0-9\-]*$').hasMatch(t)) // drop postal tokens
+        .where((t) =>
+            !RegExp(r'^[0-9][0-9\-]*$').hasMatch(t)) // drop postal tokens
         .toList();
     final city = tokens.join(' ').trim();
     return city.isEmpty ? candidate : city;
@@ -585,11 +615,13 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// Groups items into consecutive runs sharing the same locality, labelling
   /// each run with the date range precomputed for that location (keyed by the
   /// first item's position).
-  List<({String label, String? dateRange, List<ItineraryItem> items})> _buildGroups(
+  List<({String label, String? dateRange, List<ItineraryItem> items})>
+      _buildGroups(
     List<ItineraryItem> items,
     Map<int, String> locationDates,
   ) {
-    final groups = <({String label, String? dateRange, List<ItineraryItem> items})>[];
+    final groups =
+        <({String label, String? dateRange, List<ItineraryItem> items})>[];
     String? currentKey;
     List<ItineraryItem>? current;
     for (final item in items) {
@@ -608,15 +640,17 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     return groups;
   }
 
-  /// Renders a hub group's items, split into "Day N" sub-sections when items
-  /// carry day numbers (day-trip batching applied within each day). Legacy items
-  /// with no day fall back to flat day-trip batching with no day headers.
-  List<Widget> _buildGroupItemWidgets(String cityKey, List<ItineraryItem> items,
+  /// Renders a hub group's items as slivers, split into "Day N" sub-sections
+  /// when items carry day numbers (day-trip batching applied within each day).
+  /// Each day is a [MultiSliver] whose header pins below the city header while
+  /// the day's items scroll past, then is pushed off by the next day. Legacy
+  /// items with no day fall back to flat day-trip batching with no day headers.
+  List<Widget> _buildGroupItemSlivers(String cityKey, List<ItineraryItem> items,
       ThemeData theme, DateTime? tripStart) {
     if (!items.any((it) => it.day != null)) {
-      return _buildDayTripWidgets(items, theme);
+      return [_boxSliver(_buildDayTripWidgets(items, theme))];
     }
-    final widgets = <Widget>[];
+    final slivers = <Widget>[];
     var i = 0;
     while (i < items.length) {
       final day = items[i].day;
@@ -628,7 +662,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       if (day != null) {
         final dayKey = '$cityKey#$day';
         final collapsed = _collapsedDays.contains(dayKey);
-        widgets.add(_daySubHeader(day, tripStart, theme, collapsed, _runTravelMin(run), () {
+        final header = _daySubHeader(
+            day, tripStart, theme, collapsed, _runTravelMin(run), () {
           setState(() {
             if (collapsed) {
               _collapsedDays.remove(dayKey);
@@ -645,13 +680,99 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
               trip,
               RefineTarget.day(day,
                   city: cityKey == 'Other places' ? null : cityKey));
-        }));
-        if (!collapsed) widgets.addAll(_buildDayTripWidgets(run, theme));
+        });
+        slivers.add(MultiSliver(
+          pushPinnedChildren: true,
+          children: [
+            SliverPinnedHeader(child: header),
+            if (!collapsed) _boxSliver(_buildDayTripWidgets(run, theme)),
+          ],
+        ));
       } else {
-        widgets.addAll(_buildDayTripWidgets(run, theme));
+        slivers.add(_boxSliver(_buildDayTripWidgets(run, theme)));
       }
     }
-    return widgets;
+    return slivers;
+  }
+
+  /// Wraps a run of box widgets as a single sliver for use inside MultiSliver.
+  Widget _boxSliver(List<Widget> children) => SliverToBoxAdapter(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      );
+
+  /// City group header: name, date range, refine + collapse controls. Pinned
+  /// at the top of the scroll area while its group scrolls past; the opaque
+  /// Material keeps items from showing through while pinned.
+  Widget _cityHeader(
+      Trip trip,
+      ({String label, String? dateRange, List<ItineraryItem> items}) group,
+      ThemeData theme) {
+    final cityCollapsed = _collapsedCities.contains(group.label);
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: InkWell(
+        onTap: () => setState(() {
+          if (cityCollapsed) {
+            _collapsedCities.remove(group.label);
+          } else {
+            _collapsedCities.add(group.label);
+          }
+        }),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.location_on,
+                      size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      group.label,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (group.dateRange != null) ...[
+                    Icon(Icons.event,
+                        size: 14, color: theme.colorScheme.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      group.dateRange!,
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: theme.colorScheme.primary),
+                    ),
+                  ],
+                  // 'Other places' has no hub the section tool can target.
+                  if (group.label != 'Other places')
+                    IconButton(
+                      icon: const Icon(Icons.auto_awesome, size: 16),
+                      tooltip: 'Refine ${group.label}',
+                      visualDensity: VisualDensity.compact,
+                      color: theme.colorScheme.primary,
+                      onPressed: () =>
+                          _openRefine(trip, RefineTarget.city(group.label)),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    cityCollapsed ? Icons.chevron_right : Icons.expand_more,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Divider(height: 1),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Compact booking rows for a city group's slot: arrival flight + stay when
@@ -660,9 +781,7 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     ({BookingTodo? arrival, BookingTodo? stay, BookingTodo? departure}) slot, {
     required bool departureOnly,
   }) {
-    final todos = departureOnly
-        ? [slot.departure]
-        : [slot.arrival, slot.stay];
+    final todos = departureOnly ? [slot.departure] : [slot.arrival, slot.stay];
     return [
       for (final todo in todos)
         if (todo != null)
@@ -680,7 +799,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// "Day trip · <town>" sub-header so nearby towns read as excursions from the
   /// hub city rather than separate stops. Inserts a within-city travel-time
   /// connector between adjacent tiles of the same indent run.
-  List<Widget> _buildDayTripWidgets(List<ItineraryItem> items, ThemeData theme) {
+  List<Widget> _buildDayTripWidgets(
+      List<ItineraryItem> items, ThemeData theme) {
     final widgets = <Widget>[];
     ItineraryItem? prev;
     void addTile(ItineraryItem it, double indent) {
@@ -697,7 +817,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       final dt = items[i].dayTripFrom?.trim();
       if (dt != null && dt.isNotEmpty) {
         final town = _cityOf(items[i]) ?? 'Day trip';
-        widgets.add(_dayTripSubHeader(town, theme, _dayTripTravelLabel(items[i])));
+        widgets
+            .add(_dayTripSubHeader(town, theme, _dayTripTravelLabel(items[i])));
         prev = null; // don't draw a connector across the sub-header
         while (i < items.length) {
           final it = items[i];
@@ -722,8 +843,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// tiles, but only for within-city hops (same hub, truly adjacent in the
   /// itinerary order). Returns null when it shouldn't render — including while a
   /// category filter is active, since filtered tiles aren't globally adjacent.
-  Widget? _travelConnector(
-      ItineraryItem from, ItineraryItem to, double indentLeft, ThemeData theme) {
+  Widget? _travelConnector(ItineraryItem from, ItineraryItem to,
+      double indentLeft, ThemeData theme) {
     if (_itemFilter != 'all') return null;
     if (to.position != from.position + 1) return null;
     if (_hubOf(from) != _hubOf(to)) return null;
@@ -816,52 +937,62 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   }
 
   /// Day section header: shows the calendar date (day N -> startDate + (N-1))
-  /// when the trip start is known, otherwise falls back to "Day N".
-  Widget _daySubHeader(int day, DateTime? tripStart, ThemeData theme,
-      bool collapsed, int travelMin, VoidCallback onTap, VoidCallback onRefine) {
+  /// when the trip start is known, otherwise falls back to "Day N". The opaque
+  /// Material keeps items from showing through while the header is pinned.
+  Widget _daySubHeader(
+      int day,
+      DateTime? tripStart,
+      ThemeData theme,
+      bool collapsed,
+      int travelMin,
+      VoidCallback onTap,
+      VoidCallback onRefine) {
     final label = tripStart != null
         ? _fmtDayHeader(tripStart.add(Duration(days: day - 1)))
         : 'Day $day';
     final muted = theme.colorScheme.onSurfaceVariant;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-        child: Row(
-          children: [
-            Icon(Icons.today, size: 16, color: theme.colorScheme.primary),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w700,
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
+          child: Row(
+            children: [
+              Icon(Icons.today, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-            if (travelMin > 0) ...[
-              Icon(Icons.directions_car_outlined, size: 14, color: muted),
-              const SizedBox(width: 4),
-              Text(
-                '${_fmtTravel(travelMin)} travel',
-                style: theme.textTheme.bodySmall?.copyWith(color: muted),
+              if (travelMin > 0) ...[
+                Icon(Icons.directions_car_outlined, size: 14, color: muted),
+                const SizedBox(width: 4),
+                Text(
+                  '${_fmtTravel(travelMin)} travel',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+                const SizedBox(width: 8),
+              ],
+              IconButton(
+                icon: const Icon(Icons.auto_awesome, size: 16),
+                tooltip: 'Refine this day',
+                visualDensity: VisualDensity.compact,
+                color: theme.colorScheme.primary,
+                onPressed: onRefine,
               ),
-              const SizedBox(width: 8),
+              Icon(
+                collapsed ? Icons.chevron_right : Icons.expand_more,
+                size: 18,
+                color: theme.colorScheme.primary,
+              ),
             ],
-            IconButton(
-              icon: const Icon(Icons.auto_awesome, size: 16),
-              tooltip: 'Refine this day',
-              visualDensity: VisualDensity.compact,
-              color: theme.colorScheme.primary,
-              onPressed: onRefine,
-            ),
-            Icon(
-              collapsed ? Icons.chevron_right : Icons.expand_more,
-              size: 18,
-              color: theme.colorScheme.primary,
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -872,7 +1003,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
         child: Row(
           children: [
-            Icon(Icons.directions_bus, size: 16, color: theme.colorScheme.secondary),
+            Icon(Icons.directions_bus,
+                size: 16, color: theme.colorScheme.secondary),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -884,8 +1016,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
               ),
             ),
             if (travelLabel != null) ...[
-              Icon(Icons.directions_car_outlined, size: 14,
-                  color: theme.colorScheme.onSurfaceVariant),
+              Icon(Icons.directions_car_outlined,
+                  size: 14, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 4),
               Text(
                 travelLabel,
@@ -897,7 +1029,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         ),
       );
 
-  Widget _itemTile(ItineraryItem item, double indentLeft, ThemeData theme) => Padding(
+  Widget _itemTile(ItineraryItem item, double indentLeft, ThemeData theme) =>
+      Padding(
         padding: EdgeInsets.only(left: indentLeft),
         child: ListTile(
           leading: _itemLeading(item.category, item.position),
@@ -964,7 +1097,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// slice of the trip's start–end span, weighted by how many places it has; an
   /// accommodation with its own dates overrides the computed slice. Computed over
   /// the full itinerary so the category filter doesn't shift the allocation.
-  List<({String label, DateTime? start, DateTime? end})> _locationGroupRanges(Trip trip) {
+  List<({String label, DateTime? start, DateTime? end})> _locationGroupRanges(
+      Trip trip) {
     final items = trip.items ?? const <ItineraryItem>[];
     if (items.isEmpty) return const [];
     final stays = trip.accommodations ?? const <Accommodation>[];
@@ -984,13 +1118,15 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     // Auto-split the trip span across groups, weighted by item count.
     final start = DateTime.tryParse(trip.startDate ?? '');
     final end = DateTime.tryParse(trip.endDate ?? '');
-    final auto = List<({DateTime start, DateTime end})?>.filled(groups.length, null);
+    final auto =
+        List<({DateTime start, DateTime end})?>.filled(groups.length, null);
     if (start != null && end != null && !end.isBefore(start)) {
       final totalDays = end.difference(start).inDays + 1;
       final n = groups.length;
       if (n <= totalDays) {
         // Enough days: give each location a contiguous slice weighted by size.
-        final counts = _allocateDays(totalDays, [for (final g in groups) g.length]);
+        final counts =
+            _allocateDays(totalDays, [for (final g in groups) g.length]);
         var cursor = start;
         for (var i = 0; i < n; i++) {
           final rStart = cursor.isAfter(end) ? end : cursor;
@@ -1003,7 +1139,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         // More locations than days: map each to a single day in order, so dates
         // stay ascending and within the trip (some days carry several stops).
         for (var i = 0; i < n; i++) {
-          final d = start.add(Duration(days: (i * totalDays ~/ n).clamp(0, totalDays - 1)));
+          final d = start.add(
+              Duration(days: (i * totalDays ~/ n).clamp(0, totalDays - 1)));
           auto[i] = (start: d, end: d);
         }
       }
@@ -1070,20 +1207,26 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   List<int> _allocateDays(int totalDays, List<int> weights) {
     final n = weights.length;
     if (n == 0) return const [];
-    if (totalDays <= n) return List.filled(n, 1); // ranges clamp to the trip end
+    if (totalDays <= n) {
+      return List.filled(n, 1); // ranges clamp to the trip end
+    }
     final totalW = weights.fold<int>(0, (s, w) => s + (w <= 0 ? 1 : w));
-    final exact = [for (final w in weights) totalDays * (w <= 0 ? 1 : w) / totalW];
+    final exact = [
+      for (final w in weights) totalDays * (w <= 0 ? 1 : w) / totalW
+    ];
     final counts = [for (final e in exact) e.floor() < 1 ? 1 : e.floor()];
     var used = counts.fold<int>(0, (s, c) => s + c);
     // Hand out any remaining days to the largest fractional remainders.
     final byRemainder = List<int>.generate(n, (i) => i)
-      ..sort((a, b) => (exact[b] - exact[b].floor()).compareTo(exact[a] - exact[a].floor()));
+      ..sort((a, b) =>
+          (exact[b] - exact[b].floor()).compareTo(exact[a] - exact[a].floor()));
     for (var k = 0; used < totalDays; k++) {
       counts[byRemainder[k % n]] += 1;
       used++;
     }
     // Or trim back from the largest groups if min-1 overshot.
-    final byCount = List<int>.generate(n, (i) => i)..sort((a, b) => counts[b].compareTo(counts[a]));
+    final byCount = List<int>.generate(n, (i) => i)
+      ..sort((a, b) => counts[b].compareTo(counts[a]));
     for (var k = 0; used > totalDays; k++) {
       final j = byCount[k % n];
       if (counts[j] > 1) {
@@ -1106,12 +1249,28 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       '${_weekdays[d.weekday - 1]}, ${_months[d.month - 1]} ${d.day}';
 
   static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   static const _weekdays = [
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
   ];
 
   /// The trip's hero header: title (+ rename), date/status chips, a Refine
@@ -1256,7 +1415,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                     children: [
                       const Text('Could not load this trip'),
                       const SizedBox(height: 8),
-                      FilledButton(onPressed: _load, child: const Text('Retry')),
+                      FilledButton(
+                          onPressed: _load, child: const Text('Retry')),
                     ],
                   ),
                 )
@@ -1265,292 +1425,242 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                   : LayoutBuilder(builder: (context, constraints) {
                       // City-matched bookings render inside their city group;
                       // the rest fall through to the "Other bookings" section.
-                      final grouped = _groupedBookings(
-                          [for (final r in _locationGroupRanges(trip)) r.label]);
+                      final grouped = _groupedBookings([
+                        for (final r in _locationGroupRanges(trip)) r.label
+                      ]);
+                      final filtered = _filtered(trip);
+                      final groups =
+                          _buildGroups(filtered, _locationDates(trip));
+                      final tripStart = DateTime.tryParse(trip.startDate ?? '');
                       final scrollView = CustomScrollView(
                         slivers: [
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _buildHeaderCard(trip, theme),
-                                const Divider(height: 32),
-                              ],
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                            sliver: SliverToBoxAdapter(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHeaderCard(trip, theme),
+                                  const Divider(height: 32),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        // The map scrolls with the page until it reaches the top,
-                        // then stays pinned while the itinerary scrolls beneath it.
-                        if (_filtered(trip).any((i) => i.latitude != 0 || i.longitude != 0))
+                          // The map scrolls with the page until it reaches the top,
+                          // then stays pinned while the itinerary scrolls beneath it.
+                          if (_filtered(trip)
+                              .any((i) => i.latitude != 0 || i.longitude != 0))
+                            SliverPersistentHeader(
+                              pinned: true,
+                              delegate: _PinnedHeaderDelegate(
+                                height:
+                                    12 + 240 + 12, // top gap + map + bottom gap
+                                backgroundColor: theme.scaffoldBackgroundColor,
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: TripMap(
+                                    items: _filtered(trip),
+                                    selectedPosition: _selectedPosition,
+                                    segmentLabels: _segmentLabels(),
+                                    onPinTap: (pos) {
+                                      setState(() => _selectedPosition = pos);
+                                      final it = trip.items!
+                                          .firstWhere((i) => i.position == pos);
+                                      _showSnack(it.name);
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // Itinerary title + category filter; pins beneath the
+                          // map so the filter stays reachable while scrolling.
                           SliverPersistentHeader(
                             pinned: true,
                             delegate: _PinnedHeaderDelegate(
-                              height: 12 + 240 + 12, // top gap + map + bottom gap
+                              // title row (36) + gap (8) + chip row (48) + bottom
+                              // padding (8); title-row-only when there are no items.
+                              height: (trip.items ?? const []).isNotEmpty
+                                  ? 100
+                                  : 48,
                               backgroundColor: theme.scaffoldBackgroundColor,
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: TripMap(
-                                  items: _filtered(trip),
-                                  selectedPosition: _selectedPosition,
-                                  segmentLabels: _segmentLabels(),
-                                  onPinTap: (pos) {
-                                    setState(() => _selectedPosition = pos);
-                                    final it = trip.items!.firstWhere((i) => i.position == pos);
-                                    _showSnack(it.name);
-                                  },
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              // Align fills the header's full extent so the child's
+                              // measured height matches maxExtent (a min-sized
+                              // Column would be shorter, yielding an invalid sliver
+                              // geometry: layoutExtent > paintExtent).
+                              child: Align(
+                                alignment: Alignment.topLeft,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      height: 36,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text('Itinerary',
+                                                style: theme
+                                                    .textTheme.titleMedium),
+                                          ),
+                                          TextButton.icon(
+                                            onPressed: _addPlace,
+                                            style: TextButton.styleFrom(
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                            ),
+                                            icon:
+                                                const Icon(Icons.add, size: 18),
+                                            label: const Text('Add place'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if ((trip.items ?? const [])
+                                        .isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        children: [
+                                          for (final f in const [
+                                            ('all', 'All'),
+                                            ('attraction', 'Attractions'),
+                                            ('restaurant', 'Restaurants'),
+                                          ])
+                                            ChoiceChip(
+                                              label: Text(f.$2),
+                                              selected: _itemFilter == f.$1,
+                                              onSelected: (_) => setState(
+                                                  () => _itemFilter = f.$1),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),
                           ),
-                        // Itinerary title + category filter; pins beneath the
-                        // map so the filter stays reachable while scrolling.
-                        SliverPersistentHeader(
-                          pinned: true,
-                          delegate: _PinnedHeaderDelegate(
-                            // title row (36) + gap (8) + chip row (48) + bottom
-                            // padding (8); title-row-only when there are no items.
-                            height:
-                                (trip.items ?? const []).isNotEmpty ? 100 : 48,
-                            backgroundColor: theme.scaffoldBackgroundColor,
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                            // Align fills the header's full extent so the child's
-                            // measured height matches maxExtent (a min-sized
-                            // Column would be shorter, yielding an invalid sliver
-                            // geometry: layoutExtent > paintExtent).
-                            child: Align(
-                              alignment: Alignment.topLeft,
+                          if ((trip.items ?? []).isEmpty)
+                            const SliverPadding(
+                              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+                              sliver: SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Text('No places added.'),
+                                ),
+                              ),
+                            )
+                          else if (filtered.isEmpty)
+                            const SliverPadding(
+                              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+                              sliver: SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16),
+                                  child: Text('No items match this filter.'),
+                                ),
+                              ),
+                            )
+                          else
+                            // Each city is a MultiSliver whose header pins
+                            // beneath the filter bar while the city's items
+                            // scroll past, then is pushed off by the next city;
+                            // day headers nest the same way within each city.
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                              sliver: MultiSliver(children: [
+                                for (final (gi, group) in groups.indexed)
+                                  MultiSliver(
+                                    pushPinnedChildren: true,
+                                    children: [
+                                      SliverPinnedHeader(
+                                          child:
+                                              _cityHeader(trip, group, theme)),
+                                      if (!_collapsedCities
+                                          .contains(group.label)) ...[
+                                        // Embedded bookings render only in the
+                                        // unfiltered view: a category filter can
+                                        // merge adjacent same-label runs, which
+                                        // would break the slot<->group mapping.
+                                        if (_itemFilter == 'all' &&
+                                            gi < grouped.slots.length)
+                                          _boxSliver(_bookingRowWidgets(
+                                              grouped.slots[gi],
+                                              departureOnly: false)),
+                                        ..._buildGroupItemSlivers(group.label,
+                                            group.items, theme, tripStart),
+                                        if (_itemFilter == 'all' &&
+                                            gi == groups.length - 1 &&
+                                            gi < grouped.slots.length)
+                                          _boxSliver(_bookingRowWidgets(
+                                              grouped.slots[gi],
+                                              departureOnly: true)),
+                                      ],
+                                    ],
+                                  ),
+                              ]),
+                            ),
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            sliver: SliverToBoxAdapter(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  SizedBox(
-                                    height: 36,
-                                    child: Row(
+                                  // Bookings live embedded in their city groups;
+                                  // this section appears only when something
+                                  // didn't match a city (custom or stale todos).
+                                  if (grouped.residual.isEmpty)
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton.icon(
+                                        onPressed: _addBooking,
+                                        icon: const Icon(Icons.add, size: 18),
+                                        label: const Text('Add booking'),
+                                      ),
+                                    )
+                                  else ...[
+                                    const Divider(height: 32),
+                                    Row(
                                       children: [
                                         Expanded(
-                                          child: Text('Itinerary',
-                                              style:
-                                                  theme.textTheme.titleMedium),
-                                        ),
+                                            child: Text('Other bookings',
+                                                style: theme
+                                                    .textTheme.titleMedium)),
                                         TextButton.icon(
-                                          onPressed: _addPlace,
-                                          style: TextButton.styleFrom(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
+                                          onPressed: _addBooking,
                                           icon: const Icon(Icons.add, size: 18),
-                                          label: const Text('Add place'),
+                                          label: const Text('Add'),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  if ((trip.items ?? const []).isNotEmpty) ...[
                                     const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: [
-                                        for (final f in const [
-                                          ('all', 'All'),
-                                          ('attraction', 'Attractions'),
-                                          ('restaurant', 'Restaurants'),
-                                        ])
-                                          ChoiceChip(
-                                            label: Text(f.$2),
-                                            selected: _itemFilter == f.$1,
-                                            onSelected: (_) => setState(
-                                                () => _itemFilter = f.$1),
-                                          ),
-                                      ],
-                                    ),
+                                    for (final todo in grouped.residual)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 4),
+                                        child: BookingTodoCard(
+                                          todo: todo,
+                                          onBookedChanged: (v) =>
+                                              _setBooked(todo, v),
+                                          onOpen: _openCallbackFor(todo),
+                                          openLabelOverride: _flightLegs
+                                                  .containsKey(todo.todoKey)
+                                              ? 'Find flights'
+                                              : null,
+                                          onDelete: todo.auto
+                                              ? null
+                                              : () => _deleteTodo(todo),
+                                        ),
+                                      ),
                                   ],
                                 ],
                               ),
                             ),
                           ),
-                        ),
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if ((trip.items ?? []).isEmpty)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 16),
-                                    child: Text('No places added.'),
-                                  )
-                                else
-                                  Builder(builder: (_) {
-                                    final filtered = _filtered(trip);
-                                    if (filtered.isEmpty) {
-                                      return const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 16),
-                                        child: Text('No items match this filter.'),
-                                      );
-                                    }
-                                    final groups = _buildGroups(filtered, _locationDates(trip));
-                                    return Column(
-                                      children: [
-                                        for (final (gi, group)
-                                            in groups.indexed) ...[
-                                          Builder(builder: (_) {
-                                            final cityCollapsed =
-                                                _collapsedCities.contains(group.label);
-                                            return InkWell(
-                                              onTap: () => setState(() {
-                                                if (cityCollapsed) {
-                                                  _collapsedCities.remove(group.label);
-                                                } else {
-                                                  _collapsedCities.add(group.label);
-                                                }
-                                              }),
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        Icon(Icons.location_on,
-                                                            size: 18,
-                                                            color: theme.colorScheme.primary),
-                                                        const SizedBox(width: 6),
-                                                        Expanded(
-                                                          child: Text(
-                                                            group.label,
-                                                            style: theme.textTheme.titleSmall
-                                                                ?.copyWith(
-                                                                    fontWeight:
-                                                                        FontWeight.bold),
-                                                          ),
-                                                        ),
-                                                        if (group.dateRange != null) ...[
-                                                          Icon(Icons.event,
-                                                              size: 14,
-                                                              color:
-                                                                  theme.colorScheme.primary),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            group.dateRange!,
-                                                            style: theme.textTheme.labelMedium
-                                                                ?.copyWith(
-                                                                    color: theme
-                                                                        .colorScheme.primary),
-                                                          ),
-                                                        ],
-                                                        // 'Other places' has no hub the
-                                                        // section tool can target.
-                                                        if (group.label != 'Other places')
-                                                          IconButton(
-                                                            icon: const Icon(
-                                                                Icons.auto_awesome,
-                                                                size: 16),
-                                                            tooltip:
-                                                                'Refine ${group.label}',
-                                                            visualDensity:
-                                                                VisualDensity.compact,
-                                                            color: theme
-                                                                .colorScheme.primary,
-                                                            onPressed: () => _openRefine(
-                                                                trip,
-                                                                RefineTarget.city(
-                                                                    group.label)),
-                                                          ),
-                                                        const SizedBox(width: 4),
-                                                        Icon(
-                                                          cityCollapsed
-                                                              ? Icons.chevron_right
-                                                              : Icons.expand_more,
-                                                          size: 20,
-                                                          color: theme.colorScheme.primary,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    const Divider(height: 1),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          }),
-                                          if (!_collapsedCities.contains(group.label)) ...[
-                                            // Embedded bookings render only in the
-                                            // unfiltered view: a category filter can
-                                            // merge adjacent same-label runs, which
-                                            // would break the slot<->group mapping.
-                                            if (_itemFilter == 'all' &&
-                                                gi < grouped.slots.length)
-                                              ..._bookingRowWidgets(
-                                                  grouped.slots[gi],
-                                                  departureOnly: false),
-                                            ..._buildGroupItemWidgets(
-                                                group.label,
-                                                group.items,
-                                                theme,
-                                                DateTime.tryParse(trip.startDate ?? '')),
-                                            if (_itemFilter == 'all' &&
-                                                gi == groups.length - 1 &&
-                                                gi < grouped.slots.length)
-                                              ..._bookingRowWidgets(
-                                                  grouped.slots[gi],
-                                                  departureOnly: true),
-                                          ],
-                                        ],
-                                      ],
-                                    );
-                                  }),
-                                // Bookings live embedded in their city groups;
-                                // this section appears only when something
-                                // didn't match a city (custom or stale todos).
-                                if (grouped.residual.isEmpty)
-                                  Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton.icon(
-                                      onPressed: _addBooking,
-                                      icon: const Icon(Icons.add, size: 18),
-                                      label: const Text('Add booking'),
-                                    ),
-                                  )
-                                else ...[
-                                  const Divider(height: 32),
-                                  Row(
-                                    children: [
-                                      Expanded(child: Text('Other bookings', style: theme.textTheme.titleMedium)),
-                                      TextButton.icon(
-                                        onPressed: _addBooking,
-                                        icon: const Icon(Icons.add, size: 18),
-                                        label: const Text('Add'),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  for (final todo in grouped.residual)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 4),
-                                      child: BookingTodoCard(
-                                        todo: todo,
-                                        onBookedChanged: (v) => _setBooked(todo, v),
-                                        onOpen: _openCallbackFor(todo),
-                                        openLabelOverride:
-                                            _flightLegs.containsKey(todo.todoKey)
-                                                ? 'Find flights'
-                                                : null,
-                                        onDelete:
-                                            todo.auto ? null : () => _deleteTodo(todo),
-                                      ),
-                                    ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
+                        ],
+                      );
 
                       if (!_panelOpen || _refineTarget == null) {
                         return scrollView;
@@ -1588,8 +1698,9 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                               clipBehavior: Clip.antiAlias,
                               child: Padding(
                                 padding: EdgeInsets.only(
-                                    bottom:
-                                        MediaQuery.of(context).viewInsets.bottom),
+                                    bottom: MediaQuery.of(context)
+                                        .viewInsets
+                                        .bottom),
                                 child: Column(
                                   children: [
                                     // Drag handle (also a scrollable so the
@@ -1603,7 +1714,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                                           margin: const EdgeInsets.symmetric(
                                               vertical: 8),
                                           decoration: BoxDecoration(
-                                            color: theme.colorScheme.outlineVariant,
+                                            color: theme
+                                                .colorScheme.outlineVariant,
                                             borderRadius:
                                                 BorderRadius.circular(2),
                                           ),
@@ -1641,10 +1753,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   }
 
   Future<void> _launch(String url) async {
-    final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    final ok =
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     if (!ok) _showSnack('Could not open link');
   }
-
 }
 
 /// Adds a custom booking TODO. A destination (and optional dates) lets the
@@ -1699,8 +1811,10 @@ class _AddBookingTodoDialogState extends ConsumerState<_AddBookingTodoDialog> {
       await ref.read(bookingTodosApiServiceProvider).addTodo(widget.tripId, {
         'kind': _kind,
         'title': _title.text.trim(),
-        if (_nn(_destination.text) != null) 'destination': _nn(_destination.text),
-        if (isTransport && _nn(_origin.text) != null) 'origin': _nn(_origin.text),
+        if (_nn(_destination.text) != null)
+          'destination': _nn(_destination.text),
+        if (isTransport && _nn(_origin.text) != null)
+          'origin': _nn(_origin.text),
         if (_nn(_departDate.text) != null) 'depart_date': _nn(_departDate.text),
         if (!isTransport && _nn(_returnDate.text) != null)
           'return_date': _nn(_returnDate.text),

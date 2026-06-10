@@ -40,9 +40,19 @@ ItineraryItem _item(int pos, String name, String address, String category,
 BookingTodo _todo(String kind, String key, String title, {bool auto = true}) =>
     BookingTodo(id: key, kind: kind, todoKey: key, title: title, auto: auto);
 
+/// The itinerary renders lazily (slivers), so widgets below the default
+/// 800x600 test viewport never get built. A tall viewport keeps the whole
+/// page — including the trailing bookings section — built and findable.
+void _useTallViewport(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
   testWidgets('city-matched bookings embed in their group; rest are residual',
       (WidgetTester tester) async {
+    _useTallViewport(tester);
     final trip = Trip(
       id: 't1',
       title: 'Europe',
@@ -52,10 +62,14 @@ void main() {
       createdAt: '2026-06-01',
       updatedAt: '2026-06-01',
       items: [
-        _item(0, 'Louvre', 'Paris, France', 'attraction', day: 1, city: 'Paris'),
-        _item(1, 'Café de Flore', 'Paris, France', 'restaurant', day: 2, city: 'Paris'),
-        _item(2, 'Colosseum', 'Rome, Italy', 'attraction', day: 3, city: 'Rome'),
-        _item(3, 'Trastevere', 'Rome, Italy', 'restaurant', day: 4, city: 'Rome'),
+        _item(0, 'Louvre', 'Paris, France', 'attraction',
+            day: 1, city: 'Paris'),
+        _item(1, 'Café de Flore', 'Paris, France', 'restaurant',
+            day: 2, city: 'Paris'),
+        _item(2, 'Colosseum', 'Rome, Italy', 'attraction',
+            day: 3, city: 'Rome'),
+        _item(3, 'Trastevere', 'Rome, Italy', 'restaurant',
+            day: 4, city: 'Rome'),
       ],
       bookingTodos: [
         _todo('transport', 'transport:jfk>>paris', 'JFK → Paris'),
@@ -78,7 +92,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // City-matched bookings render once each, as compact embedded rows.
-    expect(find.widgetWithText(BookingTodoRow, 'Stay in Paris'), findsOneWidget);
+    expect(
+        find.widgetWithText(BookingTodoRow, 'Stay in Paris'), findsOneWidget);
     expect(find.widgetWithText(BookingTodoRow, 'Stay in Rome'), findsOneWidget);
     expect(find.widgetWithText(BookingTodoRow, 'JFK → Paris'), findsOneWidget);
     expect(find.widgetWithText(BookingTodoRow, 'Paris → Rome'), findsOneWidget);
@@ -96,11 +111,13 @@ void main() {
     // Only the unmatched custom todo remains in "Other bookings", as a card.
     expect(find.text('Other bookings'), findsOneWidget);
     expect(find.byType(BookingTodoCard), findsOneWidget);
-    expect(find.widgetWithText(BookingTodoCard, 'Museum tickets'), findsOneWidget);
+    expect(
+        find.widgetWithText(BookingTodoCard, 'Museum tickets'), findsOneWidget);
   });
 
   testWidgets('collapsing a city hides its embedded booking rows',
       (WidgetTester tester) async {
+    _useTallViewport(tester);
     final trip = Trip(
       id: 't2',
       title: 'Weekend away',
@@ -110,7 +127,8 @@ void main() {
       createdAt: '2026-06-01',
       updatedAt: '2026-06-01',
       items: [
-        _item(0, 'Louvre', 'Paris, France', 'attraction', day: 1, city: 'Paris'),
+        _item(0, 'Louvre', 'Paris, France', 'attraction',
+            day: 1, city: 'Paris'),
       ],
       bookingTodos: [
         _todo('transport', 'transport:jfk>>paris', 'JFK → Paris'),
