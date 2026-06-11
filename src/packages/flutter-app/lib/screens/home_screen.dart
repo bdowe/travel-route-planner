@@ -5,6 +5,7 @@ import '../constants/app_info.dart';
 import '../providers/auth_provider.dart';
 import '../providers/recent_trip_provider.dart';
 import '../widgets/gradient_app_bar.dart';
+import '../widgets/page_container.dart';
 import 'route_optimizer_screen.dart';
 import 'country_optimizer_screen.dart';
 import 'agent_screen.dart';
@@ -94,139 +95,142 @@ class HomeScreen extends ConsumerWidget {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 8),
+          child: PageContainer(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 8),
 
-              // AI Travel Agent hero card
-              _AgentHeroCard(onStart: _openAgent),
+                // AI Travel Agent hero card
+                _AgentHeroCard(onStart: _openAgent),
 
-              const SizedBox(height: 28),
+                const SizedBox(height: 28),
 
-              // Divider label
-              Row(
-                children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(
-                      'or use manual tools',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const Expanded(child: Divider()),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Most recently viewed trip — hidden until one has been opened.
-              if (recentTrip != null) ...[
-                _ToolRow(
-                  icon: Icons.history,
-                  color: Colors.teal.shade700,
-                  title: 'Continue planning',
-                  description: recentTrip.title,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TripDetailScreen(tripId: recentTrip.tripId),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Remaining manual tools, collapsed by default.
-              Card(
-                elevation: 2,
-                clipBehavior: Clip.antiAlias,
-                child: ExpansionTile(
-                  shape: const Border(),
-                  collapsedShape: const Border(),
-                  tilePadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.teal.shade700.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.handyman_outlined,
-                        color: Colors.teal.shade700, size: 26),
-                  ),
-                  title: Text(
-                    'More tools',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
+                // Divider label
+                Row(
                   children: [
+                    const Expanded(child: Divider()),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: _ToolRow(
-                        icon: MdiIcons.mapMarkerMultiple,
-                        color: Colors.deepOrange.shade600,
-                        title: 'Route Optimizer',
-                        description:
-                            'Optimize routes for multiple locations in a city',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const RouteOptimizerScreen()),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'or use manual tools',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: _ToolRow(
-                        icon: MdiIcons.airplane,
-                        color: Colors.blue.shade700,
-                        title: 'Find Flights',
-                        description:
-                            'Search and rank flights by price, time, and stops',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const FlightSearchScreen()),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: _ToolRow(
-                        icon: MdiIcons.earth,
-                        color: Colors.green.shade700,
-                        title: 'Country Planner',
-                        description:
-                            'Plan multi-country trips with seasonal optimization',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const CountryOptimizerScreen()),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                      child: _ToolRow(
-                        icon: Icons.home_work_outlined,
-                        color: Colors.pink.shade600,
-                        title: 'Airbnb Parser',
-                        description:
-                            'Extract photos, pricing, and details from any Airbnb link',
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (_) => const AirbnbParserScreen()),
-                        ),
-                      ),
-                    ),
+                    const Expanded(child: Divider()),
                   ],
                 ),
-              ),
 
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+
+                // Most recently viewed trip — hidden until one has been opened.
+                if (recentTrip != null) ...[
+                  _ToolRow(
+                    icon: Icons.history,
+                    color: Colors.teal.shade700,
+                    title: 'Continue planning',
+                    description: recentTrip.title,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            TripDetailScreen(tripId: recentTrip.tripId),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                // Remaining manual tools, collapsed by default.
+                Card(
+                  elevation: 2,
+                  clipBehavior: Clip.antiAlias,
+                  child: ExpansionTile(
+                    shape: const Border(),
+                    collapsedShape: const Border(),
+                    tilePadding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.shade700.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.handyman_outlined,
+                          color: Colors.teal.shade700, size: 26),
+                    ),
+                    title: Text(
+                      'More tools',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: _ToolRow(
+                          icon: MdiIcons.mapMarkerMultiple,
+                          color: Colors.deepOrange.shade600,
+                          title: 'Route Optimizer',
+                          description:
+                              'Optimize routes for multiple locations in a city',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const RouteOptimizerScreen()),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: _ToolRow(
+                          icon: MdiIcons.airplane,
+                          color: Colors.blue.shade700,
+                          title: 'Find Flights',
+                          description:
+                              'Search and rank flights by price, time, and stops',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const FlightSearchScreen()),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: _ToolRow(
+                          icon: MdiIcons.earth,
+                          color: Colors.green.shade700,
+                          title: 'Country Planner',
+                          description:
+                              'Plan multi-country trips with seasonal optimization',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const CountryOptimizerScreen()),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: _ToolRow(
+                          icon: Icons.home_work_outlined,
+                          color: Colors.pink.shade600,
+                          title: 'Airbnb Parser',
+                          description:
+                              'Extract photos, pricing, and details from any Airbnb link',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const AirbnbParserScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -239,7 +243,11 @@ class _AgentHeroCard extends StatelessWidget {
 
   const _AgentHeroCard({required this.onStart});
 
-  static const _suggestions = ['2 days in Paris', 'Museums in Rome', 'Weekend in Tokyo'];
+  static const _suggestions = [
+    '2 days in Paris',
+    'Museums in Rome',
+    'Weekend in Tokyo'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -248,7 +256,7 @@ class _AgentHeroCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.teal.shade900.withOpacity( 0.4),
+            color: Colors.teal.shade900.withOpacity(0.4),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -273,8 +281,8 @@ class _AgentHeroCard extends StatelessWidget {
                     begin: Alignment.bottomLeft,
                     end: Alignment.topRight,
                     colors: [
-                      Colors.teal.shade900.withOpacity( 0.88),
-                      Colors.teal.shade900.withOpacity( 0.35),
+                      Colors.teal.shade900.withOpacity(0.88),
+                      Colors.teal.shade900.withOpacity(0.35),
                     ],
                   ),
                 ),
@@ -297,25 +305,26 @@ class _AgentHeroCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity( 0.15),
+              color: Colors.white.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.flight_takeoff, size: 44, color: Colors.white),
+            child:
+                const Icon(Icons.flight_takeoff, size: 44, color: Colors.white),
           ),
           const SizedBox(height: 16),
           Text(
             'Plan Your Trip with AI',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             'Just describe your dream trip and I\'ll find the places and build your itinerary.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withOpacity( 0.85),
-            ),
+                  color: Colors.white.withOpacity(0.85),
+                ),
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -340,12 +349,18 @@ class _AgentHeroCard extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _suggestions.map((s) => ActionChip(
-              label: Text(s, style: TextStyle(color: Colors.teal.shade800, fontSize: 12, fontWeight: FontWeight.w500)),
-              backgroundColor: Colors.white,
-              side: BorderSide.none,
-              onPressed: () => onStart(context, initialMessage: s),
-            )).toList(),
+            children: _suggestions
+                .map((s) => ActionChip(
+                      label: Text(s,
+                          style: TextStyle(
+                              color: Colors.teal.shade800,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500)),
+                      backgroundColor: Colors.white,
+                      side: BorderSide.none,
+                      onPressed: () => onStart(context, initialMessage: s),
+                    ))
+                .toList(),
           ),
         ],
       ),
@@ -382,7 +397,7 @@ class _ToolRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: color.withOpacity( 0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 26),
@@ -395,16 +410,17 @@ class _ToolRow extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       description,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ),
