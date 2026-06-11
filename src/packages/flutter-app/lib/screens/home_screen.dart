@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
+import '../constants/app_info.dart';
 import '../providers/auth_provider.dart';
 import '../providers/recent_trip_provider.dart';
 import '../widgets/gradient_app_bar.dart';
@@ -32,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: GradientAppBar(
-        title: const Text('Travel Route Planner'),
+        title: const Text(AppInfo.name),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle),
