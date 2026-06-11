@@ -15,6 +15,14 @@ import 'trips_list_screen.dart';
 import 'trip_detail_screen.dart';
 import 'preferences_screen.dart';
 
+/// Time-of-day greeting for the home header.
+@visibleForTesting
+String greetingForHour(int hour) {
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -100,6 +108,10 @@ class HomeScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 8),
+
+                _GreetingHeader(displayName: user?.displayName),
+
+                const SizedBox(height: 16),
 
                 // AI Travel Agent hero card
                 _AgentHeroCard(onStart: _openAgent),
@@ -234,6 +246,39 @@ class HomeScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _GreetingHeader extends StatelessWidget {
+  final String? displayName;
+
+  const _GreetingHeader({required this.displayName});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final firstName = displayName?.trim().split(RegExp(r'\s+')).first;
+    final greeting = greetingForHour(DateTime.now().hour);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          (firstName == null || firstName.isEmpty)
+              ? greeting
+              : '$greeting, $firstName',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Where are we off to next?',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
