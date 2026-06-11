@@ -96,6 +96,13 @@ flutter:
   assets:
     - assets/images/
 
+  # Wayfare wordmark font (OFL-licensed), used for the home app bar logo.
+  fonts:
+    - family: Playfair Display
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay-SemiBold.ttf
+          weight: 600
+
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

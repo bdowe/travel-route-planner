@@ -7,7 +7,12 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
   final List<Widget>? actions;
 
-  const GradientAppBar({super.key, required this.title, this.actions});
+  /// Null inherits the app-wide AppBarTheme (centered); the home screen passes
+  /// false so the Wayfare wordmark sits on the left.
+  final bool? centerTitle;
+
+  const GradientAppBar(
+      {super.key, required this.title, this.actions, this.centerTitle});
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -17,6 +22,7 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       title: title,
       actions: actions,
+      centerTitle: centerTitle,
       backgroundColor: Colors.transparent,
       foregroundColor: Colors.white,
       flexibleSpace: Container(

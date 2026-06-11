@@ -42,7 +42,18 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: GradientAppBar(
-        title: const Text(AppInfo.name),
+        centerTitle: false,
+        // Wordmark: bundled Playfair Display so the logo reads as a brand,
+        // not a screen title.
+        title: const Text(
+          AppInfo.name,
+          style: TextStyle(
+            fontFamily: 'Playfair Display',
+            fontWeight: FontWeight.w600,
+            fontSize: 24,
+            letterSpacing: 0.5,
+          ),
+        ),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle),
@@ -355,7 +366,7 @@ class _AgentHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Plan Your Trip with AI',
+            'Plan less. Travel more.',
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -363,7 +374,7 @@ class _AgentHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Just describe your dream trip and I\'ll find the places and build your itinerary.',
+            'Describe the trip you\'re dreaming of and I\'ll build the full itinerary — places, days, and routes.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.white.withOpacity(0.85),
                 ),
