@@ -160,7 +160,7 @@ class HomeScreen extends ConsumerWidget {
                     'More tools',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.teal.shade700,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   children: [
@@ -168,7 +168,7 @@ class HomeScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: _ToolRow(
                         icon: MdiIcons.mapMarkerMultiple,
-                        color: Colors.teal.shade700,
+                        color: Colors.deepOrange.shade600,
                         title: 'Route Optimizer',
                         description:
                             'Optimize routes for multiple locations in a city',
@@ -182,7 +182,7 @@ class HomeScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: _ToolRow(
                         icon: MdiIcons.airplane,
-                        color: Colors.teal.shade700,
+                        color: Colors.blue.shade700,
                         title: 'Find Flights',
                         description:
                             'Search and rank flights by price, time, and stops',
@@ -196,7 +196,7 @@ class HomeScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: _ToolRow(
                         icon: MdiIcons.earth,
-                        color: Colors.teal.shade700,
+                        color: Colors.green.shade700,
                         title: 'Country Planner',
                         description:
                             'Plan multi-country trips with seasonal optimization',
@@ -210,7 +210,7 @@ class HomeScreen extends ConsumerWidget {
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       child: _ToolRow(
                         icon: Icons.home_work_outlined,
-                        color: Colors.teal.shade700,
+                        color: Colors.pink.shade600,
                         title: 'Airbnb Parser',
                         description:
                             'Extract photos, pricing, and details from any Airbnb link',
@@ -243,13 +243,7 @@ class _AgentHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 340),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.teal.shade600, Colors.teal.shade900],
-        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -259,11 +253,54 @@ class _AgentHeroCard extends StatelessWidget {
           ),
         ],
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(
+                'assets/images/hero_santorini.jpg',
+                fit: BoxFit.cover,
+              ),
+            ),
+            // Scrim: darkest in the lower-left where the text and button sit,
+            // lighter toward the upper-right so the photo shows through.
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomLeft,
+                    end: Alignment.topRight,
+                    colors: [
+                      Colors.teal.shade900.withOpacity( 0.88),
+                      Colors.teal.shade900.withOpacity( 0.35),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            _heroContent(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _heroContent(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 340),
       padding: const EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.smart_toy, size: 56, color: Colors.white),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity( 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.flight_takeoff, size: 44, color: Colors.white),
+          ),
           const SizedBox(height: 16),
           Text(
             'Plan Your Trip with AI',
@@ -358,7 +395,7 @@ class _ToolRow extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: color,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
