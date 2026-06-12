@@ -129,25 +129,6 @@ class HomeScreen extends ConsumerWidget {
 
                 const SizedBox(height: 28),
 
-                // Divider label
-                Row(
-                  children: [
-                    const Expanded(child: Divider()),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'or plan it your way',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    const Expanded(child: Divider()),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
                 // Most recently viewed trip — hidden until one has been opened.
                 if (recentTrip != null) ...[
                   _RecentTripCard(
@@ -393,7 +374,7 @@ class _AgentHeroCard extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                'Start Planning',
+                'Let\'s go',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
               ),
             ),
@@ -472,7 +453,9 @@ class _RecentTripCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'CONTINUE PLANNING',
+                        'PICK UP WHERE YOU LEFT OFF',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: Colors.white70,
                           letterSpacing: 1.2,
