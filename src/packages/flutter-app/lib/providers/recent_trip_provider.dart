@@ -6,12 +6,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_provider.dart';
 
 /// The trip detail screen the user last opened, remembered on-device so the
-/// home screen can offer a one-tap way back into it.
+/// home screen can offer a one-tap way back into it. Carries a snapshot of the
+/// date range and status so the tile can surface state, not just a name.
 class RecentTrip {
   final String tripId;
   final String title;
+  final String? dateRange;
+  final String status;
 
-  const RecentTrip({required this.tripId, required this.title});
+  const RecentTrip({
+    required this.tripId,
+    required this.title,
+    this.dateRange,
+    this.status = '',
+  });
 }
 
 class RecentTripNotifier extends StateNotifier<RecentTrip?> {
@@ -34,7 +42,12 @@ class RecentTripNotifier extends StateNotifier<RecentTrip?> {
       final id = m['id'] as String?;
       final title = m['title'] as String?;
       if (id != null && id.isNotEmpty && title != null) {
-        state = RecentTrip(tripId: id, title: title);
+        state = RecentTrip(
+          tripId: id,
+          title: title,
+          dateRange: m['dateRange'] as String?,
+          status: (m['status'] as String?) ?? '',
+        );
       }
     } catch (_) {
       // Malformed value — ignore and stay empty.
@@ -42,12 +55,31 @@ class RecentTripNotifier extends StateNotifier<RecentTrip?> {
   }
 
   /// Remember [tripId] as the most recently viewed trip. Call after a trip
-  /// detail screen successfully loads.
-  Future<void> record(String tripId, String title) async {
+  /// detail screen successfully loads. [dateRange] and [status] are a snapshot
+  /// for the home tile.
+  Future<void> record(
+    String tripId,
+    String title, {
+    String? dateRange,
+    String status = '',
+  }) async {
     if (_userId == null) return;
-    state = RecentTrip(tripId: tripId, title: title);
+    state = RecentTrip(
+      tripId: tripId,
+      title: title,
+      dateRange: dateRange,
+      status: status,
+    );
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode({'id': tripId, 'title': title}));
+    await prefs.setString(
+      _key,
+      jsonEncode({
+        'id': tripId,
+        'title': title,
+        if (dateRange != null) 'dateRange': dateRange,
+        'status': status,
+      }),
+    );
   }
 
   /// Forget the recent trip if it points at [tripId] (used when a trip is

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../navigation/app_nav.dart';
+import '../theme/spacing.dart';
+import '../utils/trip_format.dart';
+import '../widgets/empty_state.dart';
 import '../widgets/gradient_app_bar.dart';
+import '../widgets/status_pill.dart';
 import '../models/trip.dart';
 import '../providers/auth_provider.dart';
 import '../providers/trips_provider.dart';
@@ -31,47 +36,38 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
     if (state.loading && state.trips.isEmpty) {
       body = const Center(child: CircularProgressIndicator());
     } else if (state.error != null && state.trips.isEmpty) {
-      body = Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Could not load trips', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            FilledButton(
-              onPressed: () => ref.read(tripsProvider.notifier).loadTrips(),
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      body = EmptyState(
+        icon: Icons.cloud_off,
+        title: 'Could not load trips',
+        message: 'Check your connection and try again.',
+        iconColor: theme.colorScheme.error.withValues(alpha: 0.6),
+        actions: [
+          FilledButton(
+            onPressed: () => ref.read(tripsProvider.notifier).loadTrips(),
+            child: const Text('Retry'),
+          ),
+        ],
       );
     } else if (state.trips.isEmpty) {
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.luggage, size: 64, color: theme.colorScheme.primary.withValues(alpha: 0.5)),
-              const SizedBox(height: 16),
-              Text('No trips yet', style: theme.textTheme.titleLarge),
-              const SizedBox(height: 8),
-              Text(
-                'Chat with the AI agent to create your first trip.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+      body = EmptyState(
+        icon: Icons.luggage,
+        title: 'No trips yet',
+        message: 'Chat with the AI agent to create your first trip.',
+        actions: [
+          FilledButton.icon(
+            onPressed: () => ref.read(navIndexProvider.notifier).state =
+                AppTab.plan.index,
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Plan a trip'),
           ),
-        ),
+        ],
       );
     } else {
       final isAdmin = ref.watch(authProvider).user?.isAdmin ?? false;
       body = RefreshIndicator(
         onRefresh: () => ref.read(tripsProvider.notifier).loadTrips(),
         child: ListView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(AppSpacing.md),
           itemCount: state.trips.length,
           itemBuilder: (context, i) => _TripCard(trip: state.trips[i], isAdmin: isAdmin),
         ),
@@ -85,29 +81,6 @@ class _TripsListScreenState extends ConsumerState<TripsListScreen> {
       body: body,
     );
   }
-}
-
-String _shortDate(String iso) {
-  final d = DateTime.tryParse(iso);
-  if (d == null) return iso;
-  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-}
-
-const _mon = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];
-
-String _fmtDt(DateTime d) => '${_mon[d.month - 1]} ${d.day}';
-
-/// "Mon d – Mon d" from the trip's start/end (same day collapses to one);
-/// null when either date is missing/unparseable.
-String? _dateRange(Trip t) {
-  final a = DateTime.tryParse(t.startDate ?? '');
-  final b = DateTime.tryParse(t.endDate ?? '');
-  if (a == null || b == null) return null;
-  final sameDay = a.year == b.year && a.month == b.month && a.day == b.day;
-  return sameDay ? _fmtDt(a) : '${_fmtDt(a)} – ${_fmtDt(b)}';
 }
 
 /// A short destination summary from the trip's hub cities: "Paris",
@@ -139,7 +112,7 @@ class _TripCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final versions = trip.versionCount ?? 1;
     final hasHistory = isAdmin && versions > 1 && trip.chatId != null;
-    final range = _dateRange(trip);
+    final range = tripDateRange(trip.startDate, trip.endDate);
 
     final title = Text(
       _locationLabel(trip) ?? trip.title,
@@ -152,24 +125,17 @@ class _TripCard extends ConsumerWidget {
     );
 
     final subtitle = Padding(
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Wrap(
-        spacing: 10,
-        runSpacing: 4,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.xs,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           if (range != null)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.event, size: 14),
-                const SizedBox(width: 4),
-                Text(range),
-              ],
-            )
+            _DateChip(label: range)
           else
-            Text('Created ${_shortDate(trip.createdAt)}'),
-          _StatusChip(status: trip.status),
+            Text('Created ${shortDate(trip.createdAt)}'),
+          StatusPill(status: trip.status),
         ],
       ),
     );
@@ -206,29 +172,38 @@ class _TripCard extends ConsumerWidget {
   }
 }
 
-/// Small display-only status pill: a colored dot + capitalized label.
-class _StatusChip extends StatelessWidget {
-  final String status;
-  const _StatusChip({required this.status});
+/// Display-only date range, styled as a tonal pill so it pairs with the
+/// [StatusPill] beside it and matches the trip-detail header's date chip.
+class _DateChip extends StatelessWidget {
+  final String label;
+  const _DateChip({required this.label});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isPlanned = status == 'planned';
-    final label = status.isEmpty
-        ? 'Draft'
-        : '${status[0].toUpperCase()}${status.substring(1)}';
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.circle,
-          size: 10,
-          color: isPlanned ? Colors.green : theme.colorScheme.outline,
-        ),
-        const SizedBox(width: 4),
-        Text(label, style: theme.textTheme.bodySmall),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.event, size: 13, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: AppSpacing.xs),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -292,8 +267,8 @@ class _VersionList extends ConsumerWidget {
                 title: Text(versions[i].title, maxLines: 2, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   i == 0
-                      ? 'latest · ${_shortDate(versions[i].createdAt)}'
-                      : 'v${versions.length - i} · ${_shortDate(versions[i].createdAt)}',
+                      ? 'latest · ${shortDate(versions[i].createdAt)}'
+                      : 'v${versions.length - i} · ${shortDate(versions[i].createdAt)}',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _openTrip(context, versions[i].id),

@@ -16,8 +16,12 @@ import '../providers/booking_todos_provider.dart';
 import '../providers/preferences_provider.dart';
 import '../providers/api_client_provider.dart';
 import '../providers/plan_provider.dart';
+import '../theme/spacing.dart';
+import '../utils/trip_format.dart';
 import '../widgets/add_itinerary_item_dialog.dart';
 import '../widgets/booking_todo_card.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/status_pill.dart';
 import '../widgets/trip_map.dart';
 import '../widgets/trip_refine_panel.dart';
 import 'flight_search_screen.dart';
@@ -86,7 +90,12 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
           _bookingTodos = trip.bookingTodos ?? [];
         });
         // Remember this as the most recently viewed trip (home screen tile).
-        ref.read(recentTripProvider.notifier).record(trip.id, trip.title);
+        ref.read(recentTripProvider.notifier).record(
+              trip.id,
+              trip.title,
+              dateRange: tripDateRange(trip.startDate, trip.endDate),
+              status: trip.status,
+            );
       }
       // Load the home airport so the booking checklist can derive the outbound
       // and return flights (no-op / null for anonymous sessions).
@@ -1318,26 +1327,15 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                   onPressed: _editDates,
                 ),
                 PopupMenuButton<String>(
+                  tooltip: 'Change status',
                   onSelected: (v) => _patch(status: v),
                   itemBuilder: (_) => const [
                     PopupMenuItem(value: 'draft', child: Text('Draft')),
                     PopupMenuItem(value: 'planned', child: Text('Planned')),
                   ],
-                  child: Chip(
-                    avatar: Icon(
-                      Icons.circle,
-                      size: 12,
-                      color: trip.status == 'planned'
-                          ? Colors.green
-                          : theme.colorScheme.outline,
-                    ),
-                    label: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(trip.status == 'planned' ? 'Planned' : 'Draft'),
-                        const Icon(Icons.arrow_drop_down, size: 18),
-                      ],
-                    ),
+                  child: StatusPill(
+                    status: trip.status,
+                    trailing: const Icon(Icons.arrow_drop_down),
                   ),
                 ),
               ],
@@ -1544,24 +1542,20 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                             ),
                           ),
                           if ((trip.items ?? []).isEmpty)
-                            const SliverPadding(
-                              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-                              sliver: SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Text('No places added.'),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(
+                                height: 260,
+                                child: EmptyState(
+                                  icon: Icons.place_outlined,
+                                  title: 'No places yet',
+                                  message:
+                                      'Refine with AI or add a place to start your itinerary.',
                                 ),
                               ),
                             )
                           else if (filtered.isEmpty)
-                            const SliverPadding(
-                              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
-                              sliver: SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 16),
-                                  child: Text('No items match this filter.'),
-                                ),
-                              ),
+                            SliverToBoxAdapter(
+                              child: _FilterMissNotice(theme: theme),
                             )
                           else
                             // Each city is a MultiSliver whose header pins
@@ -1901,6 +1895,37 @@ class _AddBookingTodoDialogState extends ConsumerState<_AddBookingTodoDialog> {
               : const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+/// Compact, centered notice shown when a category filter hides every item — a
+/// lighter touch than the full empty state since the fix (clearing the filter)
+/// is right above it.
+class _FilterMissNotice extends StatelessWidget {
+  final ThemeData theme;
+  const _FilterMissNotice({required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+      child: Column(
+        children: [
+          Icon(
+            Icons.filter_alt_off_outlined,
+            size: 32,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'No places match this filter.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

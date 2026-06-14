@@ -164,7 +164,7 @@ class BookingTodoRow extends StatelessWidget {
           ),
           TextButton.icon(
             onPressed: onOpen,
-            icon: const Icon(Icons.open_in_new, size: 16),
+            icon: const Icon(Icons.open_in_new, size: 18),
             label: Text(_providerOpenLabel(todo, openLabelOverride)),
           ),
           // Last so the fixed-width checkboxes stay flush right and aligned
