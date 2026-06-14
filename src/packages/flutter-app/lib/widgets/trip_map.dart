@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/itinerary_item.dart';
+import '../theme/app_colors.dart';
 
 /// Plots a trip's itinerary on an OpenStreetMap: a numbered, category-tinted pin
 /// per place, a route line connecting them in itinerary order, auto-fit to the
@@ -150,8 +151,8 @@ class _TripMapState extends State<TripMap> {
             (a.point.latitude + b.point.latitude) / 2,
             (a.point.longitude + b.point.longitude) / 2,
           ),
-          width: 70,
-          height: 22,
+          width: 84,
+          height: 26,
           child: _SegmentLabel(text: label),
         ),
       );
@@ -360,11 +361,20 @@ class _SegmentLabel extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: scheme.surface.withValues(alpha: 0.9),
+          // Fully opaque with a soft shadow and a stronger border so the time
+          // reads cleanly over the map tiles and the route line beneath it.
+          color: scheme.surface,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: scheme.outlineVariant),
+          border: Border.all(color: scheme.outline),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Text(
           text,
@@ -372,7 +382,7 @@ class _SegmentLabel extends StatelessWidget {
           overflow: TextOverflow.clip,
           style: TextStyle(
             color: scheme.onSurface,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -427,16 +437,7 @@ class _Pin extends StatelessWidget {
     this.onTap,
   });
 
-  Color _color(ColorScheme scheme) {
-    switch (category) {
-      case 'restaurant':
-        return Colors.deepOrange;
-      case 'attraction':
-        return scheme.primary;
-      default:
-        return scheme.secondary;
-    }
-  }
+  Color _color(ColorScheme scheme) => AppColors.forCategory(category, scheme);
 
   @override
   Widget build(BuildContext context) {

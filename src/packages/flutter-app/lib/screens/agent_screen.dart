@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../theme/app_colors.dart';
+import '../theme/spacing.dart';
 import '../widgets/gradient_app_bar.dart';
 import '../widgets/chat_panel.dart';
+import '../widgets/empty_state.dart';
 import '../providers/plan_provider.dart';
 import '../providers/route_provider.dart';
 import 'route_optimizer_screen.dart';
@@ -45,7 +48,9 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
     for (final loc in locations) {
       routeNotifier.addLocation(loc);
     }
-    Navigator.of(context).pushReplacement(
+    // Push (not replace) so the chat stays beneath the planner in this tab's
+    // stack — back returns to the conversation.
+    Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const RouteOptimizerScreen()),
     );
   }
@@ -92,48 +97,16 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
 class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: theme.colorScheme.primary.withOpacity(0.5),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Tell me about your dream trip',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'I\'ll search for places and build an itinerary you can load into the route planner.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: const [
-                _SuggestionChip('2 days in Paris'),
-                _SuggestionChip('Museums in Rome'),
-                _SuggestionChip('Weekend in Tokyo'),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return const EmptyState(
+      icon: Icons.chat_bubble_outline,
+      title: 'Tell me about your dream trip',
+      message:
+          "I'll search for places and build an itinerary you can load into the route planner.",
+      actions: [
+        _SuggestionChip('2 days in Paris'),
+        _SuggestionChip('Museums in Rome'),
+        _SuggestionChip('Weekend in Tokyo'),
+      ],
     );
   }
 }
@@ -168,39 +141,41 @@ class _ItineraryBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.teal.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.teal.shade200),
+        color: AppColors.brandTint,
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.brand.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.teal.shade700, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Itinerary ready — $locationCount locations',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: Colors.teal.shade800,
-                  fontWeight: FontWeight.bold,
+              Icon(Icons.check_circle, color: AppColors.brand, size: 22),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'Itinerary ready — $locationCount locations',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: AppColors.brandDark,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
           ),
           if (summary != null && summary!.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               summary!,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.teal.shade700,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppColors.brandDark.withValues(alpha: 0.85),
               ),
             ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           // When the trip was saved, opening it is the primary action (it has the
           // full itinerary, bookings, etc.); loading into the route planner stays
           // available as a secondary option. Anonymous sessions have no saved
@@ -213,11 +188,11 @@ class _ItineraryBanner extends StatelessWidget {
                 icon: const Icon(Icons.luggage),
                 label: const Text('View trip'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.teal.shade600,
+                  backgroundColor: AppColors.brandLight,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -234,7 +209,7 @@ class _ItineraryBanner extends StatelessWidget {
                 icon: const Icon(Icons.map),
                 label: const Text('Load into Planner'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.teal.shade600,
+                  backgroundColor: AppColors.brandLight,
                 ),
               ),
             ),
