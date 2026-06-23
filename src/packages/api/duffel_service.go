@@ -148,7 +148,27 @@ func (d *DuffelService) do(req *http.Request) ([]byte, error) {
 func (d *DuffelService) SearchAirports(ctx context.Context, keyword string) ([]Airport, error) {
 	params := url.Values{}
 	params.Set("query", keyword)
+	return d.placeSuggestions(ctx, params)
+}
 
+// nearbyAirportRadiusMeters bounds the geographic airport lookup. 100km comfortably
+// covers an island/metro area; Duffel returns matches sorted nearest-first.
+const nearbyAirportRadiusMeters = 100000
+
+// NearbyAirports resolves a coordinate to nearby airports/cities, sorted
+// nearest-first. Used to map an itinerary place (e.g. a village like Imerovigli)
+// to a bookable airport (e.g. Santorini/JTR) when its name has no IATA match.
+func (d *DuffelService) NearbyAirports(ctx context.Context, lat, lng float64) ([]Airport, error) {
+	params := url.Values{}
+	params.Set("lat", strconv.FormatFloat(lat, 'f', -1, 64))
+	params.Set("lng", strconv.FormatFloat(lng, 'f', -1, 64))
+	params.Set("rad", strconv.Itoa(nearbyAirportRadiusMeters))
+	return d.placeSuggestions(ctx, params)
+}
+
+// placeSuggestions queries Duffel's /places/suggestions with the given params and
+// normalizes the response to []Airport (skipping entries without an IATA code).
+func (d *DuffelService) placeSuggestions(ctx context.Context, params url.Values) ([]Airport, error) {
 	req, err := d.newRequest(ctx, http.MethodGet, "/places/suggestions?"+params.Encode(), nil)
 	if err != nil {
 		return nil, err

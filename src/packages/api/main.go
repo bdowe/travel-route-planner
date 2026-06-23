@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -272,17 +273,33 @@ type FlightSearchResponse struct {
 // client and config are shared; auth is a static token).
 var duffelService = NewDuffelService()
 
-// airportsSearchHandler resolves a keyword to airports/cities for autocomplete.
+// airportsSearchHandler resolves airports/cities for autocomplete. It supports
+// two modes: free-text (?q=) and geographic (?lat=&lng=, nearest-first) — the
+// latter maps an itinerary coordinate to a bookable airport when the place name
+// has no IATA match.
 func airportsSearchHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	query := r.URL.Query().Get("q")
-	if query == "" {
-		http.Error(w, "Missing query parameter 'q'", http.StatusBadRequest)
+	q := r.URL.Query()
+	latStr, lngStr := q.Get("lat"), q.Get("lng")
+
+	var results []Airport
+	var err error
+	switch {
+	case latStr != "" && lngStr != "":
+		lat, latErr := strconv.ParseFloat(latStr, 64)
+		lng, lngErr := strconv.ParseFloat(lngStr, 64)
+		if latErr != nil || lngErr != nil {
+			http.Error(w, "Invalid 'lat'/'lng' parameters", http.StatusBadRequest)
+			return
+		}
+		results, err = duffelService.NearbyAirports(r.Context(), lat, lng)
+	case q.Get("q") != "":
+		results, err = duffelService.SearchAirports(r.Context(), q.Get("q"))
+	default:
+		http.Error(w, "Missing query parameter: provide 'q' or 'lat'+'lng'", http.StatusBadRequest)
 		return
 	}
-
-	results, err := duffelService.SearchAirports(r.Context(), query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to search airports: %v", err), http.StatusInternalServerError)
 		return
