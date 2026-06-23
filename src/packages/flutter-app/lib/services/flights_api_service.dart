@@ -37,9 +37,18 @@ class FlightsApiService {
     );
   }
 
-  Future<List<Airport>> searchAirports(String query) async {
+  Future<List<Airport>> searchAirports(String query) =>
+      _airports({'q': query});
+
+  /// Resolves a coordinate to nearby airports/cities, sorted nearest-first. Used
+  /// to map an itinerary place (e.g. a village) to a bookable airport when its
+  /// name has no IATA match.
+  Future<List<Airport>> nearestAirports(double lat, double lng) =>
+      _airports({'lat': '$lat', 'lng': '$lng'});
+
+  Future<List<Airport>> _airports(Map<String, String> params) async {
     final uri = Uri.parse('${apiClient.baseUrl}/flights/airports')
-        .replace(queryParameters: {'q': query});
+        .replace(queryParameters: params);
     final res = await apiClient.httpClient.get(uri, headers: _headers());
     if (res.statusCode == 200) {
       final body = jsonDecode(res.body) as Map<String, dynamic>;

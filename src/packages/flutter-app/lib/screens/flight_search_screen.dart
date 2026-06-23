@@ -20,11 +20,19 @@ class FlightSearchScreen extends ConsumerStatefulWidget {
   final String? prefillDestination;
   final String? prefillDepartDate;
 
+  /// Optional coordinates for the prefilled origin/destination. When the name
+  /// has no IATA match (e.g. a village like Imerovigli), these resolve to the
+  /// nearest bookable airport (e.g. Santorini/JTR).
+  final ({double lat, double lng})? prefillOriginCoord;
+  final ({double lat, double lng})? prefillDestinationCoord;
+
   const FlightSearchScreen({
     super.key,
     this.prefillOrigin,
     this.prefillDestination,
     this.prefillDepartDate,
+    this.prefillOriginCoord,
+    this.prefillDestinationCoord,
   });
 
   @override
@@ -62,50 +70,100 @@ class _FlightSearchScreenState extends ConsumerState<FlightSearchScreen> {
       setState(() => _departDate = date);
     }
 
-    if (w.prefillOrigin != null && w.prefillOrigin!.isNotEmpty) {
-      final a = await _resolve(w.prefillOrigin!);
-      if (a != null && _origin == null && mounted) setState(() => _origin = a);
-    } else {
-      // No explicit origin → fall back to the traveler's home airport.
-      await ref.read(preferencesProvider.notifier).load();
-      final code = ref.read(preferencesProvider).prefs?.homeAirport;
-      if (code != null && code.isNotEmpty && _origin == null && mounted) {
-        setState(() => _origin = Airport(iataCode: code, name: code));
-      }
+    // Resolve origin and destination concurrently so a slow/failed lookup on one
+    // side doesn't delay or blank the other. Each result is applied on its own.
+    final originFuture = (w.prefillOrigin != null && w.prefillOrigin!.isNotEmpty)
+        ? _resolve(w.prefillOrigin!, coord: w.prefillOriginCoord)
+        : _homeAirportSeed();
+    final destFuture =
+        (w.prefillDestination != null && w.prefillDestination!.isNotEmpty)
+            ? _resolve(w.prefillDestination!, coord: w.prefillDestinationCoord)
+            : Future<Airport?>.value(null);
+
+    final resolved = await Future.wait([originFuture, destFuture]);
+    final origin = resolved[0];
+    final dest = resolved[1];
+    if (origin != null && _origin == null && mounted) {
+      setState(() => _origin = origin);
+    }
+    if (dest != null && _destination == null && mounted) {
+      setState(() => _destination = dest);
     }
 
-    if (w.prefillDestination != null && w.prefillDestination!.isNotEmpty) {
-      final a = await _resolve(w.prefillDestination!);
-      if (a != null && _destination == null && mounted) {
-        setState(() => _destination = a);
-      }
-    }
+    // Run the search as soon as it's runnable (both endpoints resolved + a date),
+    // regardless of which inputs were prefilled vs. seeded — so the caller lands
+    // on results without tapping Search.
+    if (mounted && _canSearch) _search();
+  }
 
-    // Fully prefilled (origin + destination + date all given and resolved) →
-    // run the search immediately so the caller lands on results.
-    if (mounted &&
-        w.prefillOrigin != null &&
-        w.prefillDestination != null &&
-        w.prefillDepartDate != null &&
-        _canSearch) {
-      _search();
-    }
+  /// Falls back to the traveler's saved home airport when no explicit origin was
+  /// prefilled. Returns null when none is set.
+  Future<Airport?> _homeAirportSeed() async {
+    await ref.read(preferencesProvider.notifier).load();
+    final code = ref.read(preferencesProvider).prefs?.homeAirport;
+    if (code == null || code.isEmpty) return null;
+    return Airport(iataCode: code, name: code);
   }
 
   /// Resolves an IATA code or city name to an [Airport]. A 3-letter alphabetic
-  /// input is used as-is; otherwise the Duffel airport search resolves it (first
-  /// match). Mirrors the backend's resolveIATA.
-  Future<Airport?> _resolve(String query) async {
+  /// input is used as-is; otherwise the Duffel airport search resolves it. When
+  /// the raw label finds nothing (e.g. a label with a postal/qualifier prefix),
+  /// it retries once with a cleaned query, then — if [coord] is given — falls
+  /// back to the nearest airport by coordinate (e.g. a village -> its island
+  /// airport). Mirrors the backend's resolveIATA.
+  Future<Airport?> _resolve(String query, {({double lat, double lng})? coord}) async {
     final q = query.trim();
     final isCode = q.length == 3 && RegExp(r'^[A-Za-z]{3}$').hasMatch(q);
     if (isCode) return Airport(iataCode: q.toUpperCase(), name: q.toUpperCase());
+
+    final cleaned = _cleanLabel(q);
+    final attempts = <String>[q, if (cleaned != q) cleaned];
+    for (final attempt in attempts) {
+      final hit = await _lookupAirport(attempt);
+      if (hit != null) return hit;
+    }
+    if (coord != null) return _nearestAirport(coord.lat, coord.lng);
+    return null;
+  }
+
+  /// Looks up the nearest bookable airport to a coordinate. Returns null on
+  /// empty results or any error.
+  Future<Airport?> _nearestAirport(double lat, double lng) async {
     try {
       final results =
-          await ref.read(flightsApiServiceProvider).searchAirports(q);
-      return results.isNotEmpty ? results.first : null;
+          await ref.read(flightsApiServiceProvider).nearestAirports(lat, lng);
+      return results.isEmpty ? null : results.first;
     } catch (_) {
       return null;
     }
+  }
+
+  /// Runs one airport lookup, preferring an `airport`-type result over a `city`
+  /// (so we book against a concrete airport when the typeahead returns both).
+  /// Returns null on empty results or any error so the caller can retry/fall back.
+  Future<Airport?> _lookupAirport(String query) async {
+    try {
+      final results =
+          await ref.read(flightsApiServiceProvider).searchAirports(query);
+      if (results.isEmpty) return null;
+      return results.firstWhere(
+        (a) => a.subType.toLowerCase() == 'airport',
+        orElse: () => results.first,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Drops any trailing qualifier after a comma and collapses a leading
+  /// postal/qualifier token, e.g. "1400 Lisboa, Portugal" -> "Lisboa".
+  String _cleanLabel(String label) {
+    var s = label.split(',').first.trim();
+    final tokens = s.split(RegExp(r'\s+'));
+    if (tokens.length > 1 && RegExp(r'\d').hasMatch(tokens.first)) {
+      s = tokens.sublist(1).join(' ').trim();
+    }
+    return s.isEmpty ? label : s;
   }
 
   bool get _canSearch =>

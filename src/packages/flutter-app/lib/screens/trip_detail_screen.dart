@@ -31,6 +31,10 @@ import '../widgets/trip_map.dart';
 import '../widgets/trip_refine_panel.dart';
 import 'flight_search_screen.dart';
 
+/// A geographic coordinate used to resolve an itinerary place to its nearest
+/// bookable airport when the place name has no IATA match.
+typedef _Coord = ({double lat, double lng});
+
 class TripDetailScreen extends ConsumerStatefulWidget {
   final String tripId;
   const TripDetailScreen({super.key, required this.tripId});
@@ -58,8 +62,17 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   final Set<String> _collapsedDays = {};
   String?
       _homeAirport; // traveler's saved home airport (IATA), for outbound/return flights
-  // todo_key -> flight leg, so a transport booking item can open Find Flights prefilled.
-  Map<String, ({String origin, String destination, String? date})> _flightLegs =
+  // todo_key -> flight leg, so a transport booking item can open Find Flights
+  // prefilled. Coords resolve an endpoint to its nearest airport when the city
+  // label has no IATA match (e.g. a village like Imerovigli -> Santorini/JTR).
+  Map<String,
+          ({
+            String origin,
+            String destination,
+            String? date,
+            _Coord? originCoord,
+            _Coord? destCoord
+          })> _flightLegs =
       {};
   // todo_key -> ferry leg (Greek port<->port), so the booking item opens the
   // Ferryhopper search for that route instead of a flight.
@@ -184,8 +197,14 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   List<Map<String, dynamic>> _deriveTodos(Trip trip) {
     final ranges = _locationGroupRanges(trip);
     final todos = <Map<String, dynamic>>[];
-    final legs =
-        <String, ({String origin, String destination, String? date})>{};
+    final legs = <String,
+        ({
+          String origin,
+          String destination,
+          String? date,
+          _Coord? originCoord,
+          _Coord? destCoord
+        })>{};
     final ferryLegs =
         <String, ({String origin, String destination, String? date})>{};
     var pos = 0;
@@ -193,8 +212,10 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
     final hasHome = home != null && home.isNotEmpty && ranges.isNotEmpty;
 
     // Adds a transport (flight) todo and records its leg so the booking item can
-    // open Find Flights prefilled.
-    void addFlight(String origin, String destination, DateTime? when) {
+    // open Find Flights prefilled. Coords (when known) resolve an endpoint to its
+    // nearest airport if the city label itself has no IATA match.
+    void addFlight(String origin, String destination, DateTime? when,
+        {_Coord? originCoord, _Coord? destCoord}) {
       final date = when == null ? null : _fmt(when);
       final key =
           'transport:${origin.toLowerCase()}>>${destination.toLowerCase()}';
@@ -210,7 +231,13 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         if (date != null) 'depart_date': date,
         'passengers': 1,
       });
-      legs[key] = (origin: origin, destination: destination, date: date);
+      legs[key] = (
+        origin: origin,
+        destination: destination,
+        date: date,
+        originCoord: originCoord,
+        destCoord: destCoord,
+      );
     }
 
     // Adds a transport (ferry) todo for a Greek port<->port leg and records it so
@@ -236,17 +263,20 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
 
     // A leg between two Greek ports/islands (incl. Athens/Piraeus) is a ferry;
     // the long-haul home<->Greece legs stay flights.
-    void addLeg(String origin, String destination, DateTime? when) {
+    void addLeg(String origin, String destination, DateTime? when,
+        {_Coord? originCoord, _Coord? destCoord}) {
       if (_isGreekIsland(origin) && _isGreekIsland(destination)) {
         addFerry(origin, destination, when);
       } else {
-        addFlight(origin, destination, when);
+        addFlight(origin, destination, when,
+            originCoord: originCoord, destCoord: destCoord);
       }
     }
 
     // Outbound: home airport -> first city, on the trip's start date.
     if (hasHome) {
-      addFlight(home, ranges.first.label, ranges.first.start);
+      addFlight(home, ranges.first.label, ranges.first.start,
+          destCoord: ranges.first.coord);
     }
 
     for (var i = 0; i < ranges.length; i++) {
@@ -268,13 +298,15 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         'guests': 1,
       });
       if (i < ranges.length - 1) {
-        addLeg(label, ranges[i + 1].label, r.end);
+        addLeg(label, ranges[i + 1].label, r.end,
+            originCoord: r.coord, destCoord: ranges[i + 1].coord);
       }
     }
 
     // Return: last city -> home airport, on the trip's end date.
     if (hasHome) {
-      addFlight(ranges.last.label, home, ranges.last.end);
+      addFlight(ranges.last.label, home, ranges.last.end,
+          originCoord: ranges.last.coord);
     }
 
     _flightLegs = legs;
@@ -1264,8 +1296,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
   /// slice of the trip's start–end span, weighted by how many places it has; an
   /// accommodation with its own dates overrides the computed slice. Computed over
   /// the full itinerary so the category filter doesn't shift the allocation.
-  List<({String label, DateTime? start, DateTime? end})> _locationGroupRanges(
-      Trip trip) {
+  List<({String label, DateTime? start, DateTime? end, _Coord? coord})>
+      _locationGroupRanges(Trip trip) {
     final items = trip.items ?? const <ItineraryItem>[];
     if (items.isEmpty) return const [];
     final stays = trip.accommodations ?? const <Accommodation>[];
@@ -1313,7 +1345,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
       }
     }
 
-    final result = <({String label, DateTime? start, DateTime? end})>[];
+    final result =
+        <({String label, DateTime? start, DateTime? end, _Coord? coord})>[];
     for (var i = 0; i < groups.length; i++) {
       final g = groups[i];
       final locality = _hubOf(g.first);
@@ -1324,9 +1357,21 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
         label: locality ?? 'Other places',
         start: accRange?.start ?? dayRange?.start ?? a?.start,
         end: accRange?.end ?? dayRange?.end ?? a?.end,
+        coord: _groupCoord(g),
       ));
     }
     return result;
+  }
+
+  /// A representative coordinate for a location group: the first item with real
+  /// coordinates. (0,0) is the "no location" sentinel for manually-added places.
+  _Coord? _groupCoord(List<ItineraryItem> group) {
+    for (final it in group) {
+      if (it.latitude != 0 || it.longitude != 0) {
+        return (lat: it.latitude, lng: it.longitude);
+      }
+    }
+    return null;
   }
 
   /// Date range for a location group from its items' AI-assigned day numbers,
@@ -1914,6 +1959,8 @@ class _TripDetailScreenState extends ConsumerState<TripDetailScreen> {
                 prefillOrigin: leg.origin,
                 prefillDestination: leg.destination,
                 prefillDepartDate: leg.date,
+                prefillOriginCoord: leg.originCoord,
+                prefillDestinationCoord: leg.destCoord,
               ),
             ));
       }
