@@ -84,7 +84,7 @@ class OnboardingQuizScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingQuizScreenState extends ConsumerState<OnboardingQuizScreen> {
-  static const _stepCount = 8;
+  static const _stepCount = 9;
 
   final _pageController = PageController();
   int _step = 0;
@@ -96,6 +96,7 @@ class _OnboardingQuizScreenState extends ConsumerState<OnboardingQuizScreen> {
   String? _workStyle;
   final Set<String> _interests = {};
   String? _companions;
+  String? _gender;
   String? _fitnessRoutine;
   String? _outdoorIntensity;
   String? _baggage;
@@ -130,6 +131,7 @@ class _OnboardingQuizScreenState extends ConsumerState<OnboardingQuizScreen> {
     // blank. Every new preference field MUST be added here or an untouched
     // retake shows an empty chip row over a stored value.
     _companions = prefs.companions;
+    _gender = prefs.gender;
     _fitnessRoutine = prefs.fitnessRoutine;
     _outdoorIntensity = prefs.outdoorIntensity;
     _baggage = prefs.baggage;
@@ -183,6 +185,7 @@ class _OnboardingQuizScreenState extends ConsumerState<OnboardingQuizScreen> {
           pace: _pace,
           workStyle: _workStyle,
           companions: _companions,
+          gender: _gender,
           fitnessRoutine: _fitnessRoutine,
           outdoorIntensity: _outdoorIntensity,
           baggage: _baggage,
@@ -368,6 +371,18 @@ class _OnboardingQuizScreenState extends ConsumerState<OnboardingQuizScreen> {
                     selected: _companions,
                     onSelected: (v) => setState(() => _companions = v),
                     labelBuilder: (v) => companionLabel(l10n, v),
+                  ),
+                ],
+              ),
+              _buildStep(
+                title: l10n.quizGenderTitle,
+                subtitle: l10n.quizGenderSubtitle,
+                children: [
+                  ChoiceChipRow(
+                    options: genderOptions,
+                    selected: _gender,
+                    onSelected: (v) => setState(() => _gender = v),
+                    labelBuilder: (v) => genderLabel(l10n, v),
                   ),
                 ],
               ),

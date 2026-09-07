@@ -222,6 +222,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Flight prices are quoted with this bag included, so the cheapest option really is the cheapest.';
 
   @override
+  String get prefsGender => 'Gender';
+
+  @override
+  String get prefsGenderHelp =>
+      'Optional — used only for advice that depends on it, like what to pack or safety tips. Tap your selection again to remove it.';
+
+  @override
+  String get prefsGenderMale => 'Male';
+
+  @override
+  String get prefsGenderFemale => 'Female';
+
+  @override
   String get prefsPaceRelaxed => 'relaxed';
 
   @override
@@ -784,6 +797,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get quizBaggageSubtitle =>
       'So the fares you\'re shown already include your bag fees.';
+
+  @override
+  String get quizGenderTitle => 'What\'s your gender?';
+
+  @override
+  String get quizGenderSubtitle =>
+      'Optional — it helps with packing suggestions and safety tips. Skip it if you\'d rather not say.';
 
   @override
   String get quizTripsTitle => 'Any trips you\'re dreaming about?';

@@ -63,7 +63,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// Product name. Not translated — it is a brand name.
@@ -493,6 +493,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Flight prices are quoted with this bag included, so the cheapest option really is the cheapest.'**
   String get prefsBaggageHelp;
+
+  /// No description provided for @prefsGender.
+  ///
+  /// In en, this message translates to:
+  /// **'Gender'**
+  String get prefsGender;
+
+  /// No description provided for @prefsGenderHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — used only for advice that depends on it, like what to pack or safety tips. Tap your selection again to remove it.'**
+  String get prefsGenderHelp;
+
+  /// No description provided for @prefsGenderMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get prefsGenderMale;
+
+  /// No description provided for @prefsGenderFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get prefsGenderFemale;
 
   /// Trip pace option shown on a chip; the stored API value stays 'relaxed'.
   ///
@@ -1561,6 +1585,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'So the fares you\'re shown already include your bag fees.'**
   String get quizBaggageSubtitle;
+
+  /// No description provided for @quizGenderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your gender?'**
+  String get quizGenderTitle;
+
+  /// No description provided for @quizGenderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — it helps with packing suggestions and safety tips. Skip it if you\'d rather not say.'**
+  String get quizGenderSubtitle;
 
   /// No description provided for @quizTripsTitle.
   ///
@@ -7200,8 +7236,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

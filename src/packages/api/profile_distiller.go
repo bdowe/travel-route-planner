@@ -25,6 +25,11 @@ const (
 		"Call update_traveler_profile once. Set profile_notes to the COMPLETE traveler profile: the current notes merged with anything new from the conversation, de-duplicated, as short bullet lines (max ~15, under 1800 characters). " +
 		"Keep only durable facts about how this person travels (dietary needs, accommodation style, likes/dislikes, accessibility) — no one-off trip details, no sensitive information (health, religion, politics). " +
 		"Only set budget, pace, interests, home_airport, work_style, fitness_routine, outdoor_intensity, companions, or baggage if the conversation clearly establishes them; omit any field you are unsure about. If nothing durable was learned, omit profile_notes too."
+	// gender is DELIBERATELY absent from the minable fields: it is stored
+	// only when the traveler states it (quiz, Travel profile, or telling the
+	// agent directly, which routes through save_preferences' own
+	// stated-it-themselves rule) — a background distiller inferring it from
+	// conversation is exactly the guess that field must never contain.
 )
 
 // distillTravelerProfile runs one non-streamed Claude call over the chat

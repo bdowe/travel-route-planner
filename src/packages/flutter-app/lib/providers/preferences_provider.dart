@@ -73,6 +73,7 @@ class PreferencesNotifier extends StateNotifier<PreferencesState> {
     String? outdoorIntensity,
     String? companions,
     String? baggage,
+    String? gender,
   }) async {
     state = state.copyWith(saving: true, error: null);
     try {
@@ -86,7 +87,8 @@ class PreferencesNotifier extends StateNotifier<PreferencesState> {
           fitnessRoutine: fitnessRoutine,
           outdoorIntensity: outdoorIntensity,
           companions: companions,
-          baggage: baggage);
+          baggage: baggage,
+          gender: gender);
       state = state.copyWith(prefs: prefs, saving: false);
       return true;
     } catch (e) {

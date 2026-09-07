@@ -141,6 +141,10 @@
   "prefsOutdoorChallenging": "challenging — long and steep",
   "prefsBaggage": "What you fly with",
   "prefsBaggageHelp": "Flight prices are quoted with this bag included, so the cheapest option really is the cheapest.",
+  "prefsGender": "Gender",
+  "prefsGenderHelp": "Optional — used only for advice that depends on it, like what to pack or safety tips. Tap your selection again to remove it.",
+  "prefsGenderMale": "Male",
+  "prefsGenderFemale": "Female",
   "prefsPaceRelaxed": "relaxed",
   "@prefsPaceRelaxed": {
     "description": "Trip pace option shown on a chip; the stored API value stays 'relaxed'."
@@ -325,6 +329,8 @@
   "quizHomeAirportTitle": "Where do you fly from?",
   "quizBaggageTitle": "What do you fly with?",
   "quizBaggageSubtitle": "So the fares you're shown already include your bag fees.",
+  "quizGenderTitle": "What's your gender?",
+  "quizGenderSubtitle": "Optional — it helps with packing suggestions and safety tips. Skip it if you'd rather not say.",
   "quizTripsTitle": "Any trips you're dreaming about?",
   "quizTripsSubtitle": "Places, seasons, occasions — the planner will keep them in mind.",
   "quizTripsHint": "e.g. Japan for cherry blossom season, a Greek island hop next summer…",

@@ -35,6 +35,9 @@ class TravelerPreferences {
   /// said, which prices a cabin bag rather than assuming they carry nothing.
   final String? baggage;
 
+  /// 'male' | 'female'; null = not stated (a first-class state, see 00076).
+  final String? gender;
+
   const TravelerPreferences({
     this.budget,
     this.pace,
@@ -46,6 +49,7 @@ class TravelerPreferences {
     this.outdoorIntensity,
     this.companions,
     this.baggage,
+    this.gender,
   });
 
   factory TravelerPreferences.fromJson(Map<String, dynamic> json) =>

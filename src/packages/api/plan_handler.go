@@ -1134,6 +1134,12 @@ func personalizedSystemPrompt(base string, p *store.TravelerPreference) string {
 	if len(p.Interests) > 0 {
 		parts = append(parts, "interests: "+strings.Join(p.Interests, ", "))
 	}
+	if p.Gender != nil && *p.Gender != "" {
+		// Stated by the traveler (quiz, profile, or their own words via
+		// save_preferences — never inferred). Listed for the advice that
+		// genuinely depends on it: what to wear, safety-relevant framing.
+		parts = append(parts, "gender: "+*p.Gender)
+	}
 	var homeNote string
 	if p.HomeAirport != nil && *p.HomeAirport != "" {
 		parts = append(parts, "home airport: "+*p.HomeAirport)

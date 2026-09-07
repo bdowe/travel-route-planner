@@ -27,6 +27,7 @@ class _FakePrefsApi implements PreferencesApiService {
   TravelerPreferences stored;
   int saveCalls = 0;
   final List<String?> homeAirportArgs = [];
+  final List<String?> genderArgs = [];
 
   _FakePrefsApi({required this.stored});
 
@@ -48,9 +49,11 @@ class _FakePrefsApi implements PreferencesApiService {
     String? outdoorIntensity,
     String? companions,
     String? baggage,
+    String? gender,
   }) async {
     saveCalls++;
     homeAirportArgs.add(homeAirport);
+    genderArgs.add(gender);
     // Mirror the server: "" clears, a code replaces, null keeps.
     final next = homeAirport == null
         ? stored.homeAirport
@@ -82,7 +85,8 @@ class _FakeFlightsApi extends FlightsApiService {
       ];
 }
 
-Future<_FakePrefsApi> _pump(WidgetTester tester, {String? saved}) async {
+Future<_FakePrefsApi> _pump(WidgetTester tester,
+    {String? saved, String? gender}) async {
   // The profile is ~2000px tall since the active-profile sections landed, so
   // the airport field and Save sit far below the default 800x600 surface and
   // taps miss the hit test. Give the test a surface tall enough to hold it all.
@@ -91,7 +95,8 @@ Future<_FakePrefsApi> _pump(WidgetTester tester, {String? saved}) async {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
-  final api = _FakePrefsApi(stored: TravelerPreferences(homeAirport: saved));
+  final api = _FakePrefsApi(
+      stored: TravelerPreferences(homeAirport: saved, gender: gender));
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -179,5 +184,35 @@ void main() {
     expect(api.stored.homeAirport, isNull);
     // The field shows the stored post-state, not a hopeful local one.
     expect(_airportField(t).controller?.text, isEmpty);
+  });
+
+  // specs/traveler-gender: the profile row can SET and — uniquely for an enum
+  // field — CLEAR. Deselecting a loaded value must save as "" (the wire
+  // clear), never as null (which the server reads as "keep").
+  group('gender row', () {
+    testWidgets('selecting a chip saves the value', (t) async {
+      final api = await _pump(t);
+      await t.tap(find.text('Male'));
+      await t.pump();
+      await _save(t);
+      expect(api.genderArgs.last, 'male');
+    });
+
+    testWidgets('deselecting a loaded gender saves a clear, not a keep',
+        (t) async {
+      final api = await _pump(t, gender: 'female');
+      // Tapping the selected chip clears the row (ChoiceChipRow contract).
+      await t.tap(find.text('Female'));
+      await t.pump();
+      await _save(t);
+      expect(api.genderArgs.last, '',
+          reason: 'null would COALESCE-keep the stored value server-side');
+    });
+
+    testWidgets('an untouched unset row saves nothing', (t) async {
+      final api = await _pump(t);
+      await _save(t);
+      expect(api.genderArgs.last, isNull);
+    });
   });
 }
