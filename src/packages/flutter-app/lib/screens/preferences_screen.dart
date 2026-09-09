@@ -67,6 +67,10 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
   String? _fitnessRoutine;
   String? _outdoorIntensity;
   String? _baggage;
+  String? _gender;
+  // What the server had when the screen loaded: a deselect (null) on a
+  // previously-set gender must SAVE as a clear (''), never as keep.
+  String? _loadedGender;
   final Set<String> _interests = {};
   Airport? _homeAirport;
 
@@ -113,6 +117,8 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
         _fitnessRoutine = prefs.fitnessRoutine;
         _outdoorIntensity = prefs.outdoorIntensity;
         _baggage = prefs.baggage;
+        _gender = prefs.gender;
+        _loadedGender = prefs.gender;
         _interests.addAll(prefs.interests);
         _seedHomeAirport(prefs.homeAirport);
         _notesController.text = prefs.profileNotes ?? '';
@@ -168,6 +174,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
           fitnessRoutine: _fitnessRoutine,
           outdoorIntensity: _outdoorIntensity,
           baggage: _baggage,
+          gender: _gender ?? (_loadedGender != null ? '' : null),
           interests: _interests.toList(),
           // "" is an explicit clear, not an omission — null would be COALESCEd
           // back to the stored code, making a home airport unremovable.
@@ -418,6 +425,16 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
                           ),
                         ],
                         const Divider(height: AppSpacing.xxl),
+                        _PrefRow(
+                          label: l10n.prefsGender,
+                          help: l10n.prefsGenderHelp,
+                          child: ChoiceChipRow(
+                            options: genderOptions,
+                            selected: _gender,
+                            onSelected: (v) => setState(() => _gender = v),
+                            labelBuilder: (v) => genderLabel(l10n, v),
+                          ),
+                        ),
                         _PrefRow(
                           label: l10n.prefsBaggage,
                           help: l10n.prefsBaggageHelp,

@@ -225,6 +225,19 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los precios de los vuelos se calculan con este equipaje incluido, para que la opción más barata lo sea de verdad.';
 
   @override
+  String get prefsGender => 'Género';
+
+  @override
+  String get prefsGenderHelp =>
+      'Opcional: se usa solo para consejos que dependen de ello, como qué llevar o recomendaciones de seguridad. Toca tu selección de nuevo para quitarla.';
+
+  @override
+  String get prefsGenderMale => 'Hombre';
+
+  @override
+  String get prefsGenderFemale => 'Mujer';
+
+  @override
   String get prefsPaceRelaxed => 'relajado';
 
   @override
@@ -793,6 +806,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get quizBaggageSubtitle =>
       'Así las tarifas que te mostremos ya incluirán el coste de tu equipaje.';
+
+  @override
+  String get quizGenderTitle => '¿Cuál es tu género?';
+
+  @override
+  String get quizGenderSubtitle =>
+      'Opcional: ayuda con sugerencias de equipaje y consejos de seguridad. Sáltalo si prefieres no decirlo.';
 
   @override
   String get quizTripsTitle => '¿Sueñas con algún viaje?';

@@ -59,6 +59,7 @@ class _FakePrefsService implements PreferencesApiService {
   TravelerPreferences result = const TravelerPreferences();
   int getCalls = 0;
   String? savedWorkStyle;
+  String? savedGender;
   String? savedCompanions;
   String? savedFitnessRoutine;
   String? savedOutdoorIntensity;
@@ -87,8 +88,10 @@ class _FakePrefsService implements PreferencesApiService {
     String? outdoorIntensity,
     String? companions,
     String? baggage,
+    String? gender,
   }) async {
     savedWorkStyle = workStyle;
+    savedGender = gender;
     savedCompanions = companions;
     savedFitnessRoutine = fitnessRoutine;
     savedOutdoorIntensity = outdoorIntensity;
@@ -247,13 +250,14 @@ void main() {
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(find.text('Do you work while you travel?'), findsOneWidget);
-      expect(find.text('Step 2 of 8'), findsOneWidget);
+      expect(find.text('Step 2 of 9'), findsOneWidget);
 
       await tester.tap(find.text('yes — I work as I travel'));
       await tester.pump();
 
-      // Walk to the last step and finish.
-      for (var i = 0; i < 6; i++) {
+      // Walk to the last step and finish (7 hops now that the gender step
+      // sits between companions and home airport).
+      for (var i = 0; i < 7; i++) {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
       }
@@ -298,14 +302,14 @@ void main() {
         await tester.pumpAndSettle();
       }
       expect(find.text('How active are your trips?'), findsOneWidget);
-      expect(find.text('Step 4 of 8'), findsOneWidget);
+      expect(find.text('Step 4 of 9'), findsOneWidget);
 
       await tester.tap(find.text('gym access'));
       await tester.pump();
       await tester.tap(find.text('challenging — long and steep'));
       await tester.pump();
 
-      for (var i = 0; i < 4; i++) {
+      for (var i = 0; i < 5; i++) {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
       }
@@ -369,7 +373,7 @@ void main() {
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
       expect(find.text('Do you work while you travel?'), findsOneWidget);
-      expect(find.text('Step 2 of 8'), findsOneWidget);
+      expect(find.text('Step 2 of 9'), findsOneWidget);
 
       // System back: intercepted by PopScope -> back to step 1, quiz intact.
       final navigator = tester.state<NavigatorState>(find.byType(Navigator));
@@ -379,7 +383,7 @@ void main() {
 
       expect(find.byType(OnboardingQuizScreen), findsOneWidget);
       expect(find.text("What's your travel style?"), findsOneWidget);
-      expect(find.text('Step 1 of 8'), findsOneWidget);
+      expect(find.text('Step 1 of 9'), findsOneWidget);
     });
   });
 
@@ -397,6 +401,81 @@ void main() {
 
       expect(find.byType(LandingScreen), findsOneWidget);
       expect(find.byType(OnboardingQuizScreen), findsNothing);
+    });
+  });
+
+  // specs/traveler-gender: optional, skippable, seeded on retake.
+  group('gender step', () {
+    testWidgets('selecting a chip and finishing saves gender', (tester) async {
+      final service = _FakePrefsService();
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          preferencesApiServiceProvider.overrideWithValue(service),
+          authProvider.overrideWith(
+              (ref) => _FakeAuthNotifier(_user(needsOnboarding: true))),
+        ],
+        child: localizedTestApp(home: const OnboardingQuizScreen()),
+      ));
+      await tester.pump();
+
+      // Style -> work -> interests -> active -> companions -> gender (6 of 9).
+      for (var i = 0; i < 5; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text("What's your gender?"), findsOneWidget);
+      expect(find.text('Step 6 of 9'), findsOneWidget);
+
+      await tester.tap(find.text('Female'));
+      await tester.pump();
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('Finish'));
+      await tester.pump();
+
+      expect(service.savedGender, 'female');
+    });
+
+    testWidgets('skipping the step saves nothing', (tester) async {
+      final service = _FakePrefsService();
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          preferencesApiServiceProvider.overrideWithValue(service),
+          authProvider.overrideWith(
+              (ref) => _FakeAuthNotifier(_user(needsOnboarding: true))),
+        ],
+        child: localizedTestApp(home: const OnboardingQuizScreen()),
+      ));
+      await tester.pump();
+
+      for (var i = 0; i < 8; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.text('Finish'));
+      await tester.pump();
+
+      expect(service.savedGender, isNull,
+          reason: 'not stated is a first-class state — a skipped step must '
+              'never write a value');
+    });
+
+    testWidgets('retake seeds the saved gender', (tester) async {
+      final service = _FakePrefsService()
+        ..result = const TravelerPreferences(gender: 'female');
+      await _pumpRetake(tester, service);
+      await tester.pump();
+      await tester.pump();
+
+      for (var i = 0; i < 5; i++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
+      final chip =
+          tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Female'));
+      expect(chip.selected, isTrue);
     });
   });
 }

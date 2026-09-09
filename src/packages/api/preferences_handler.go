@@ -27,6 +27,10 @@ var allowedOutdoorIntensities = map[string]bool{"easy": true, "moderate": true, 
 
 var allowedCompanions = map[string]bool{"solo": true, "partner": true, "friends": true, "family_with_kids": true, "varies": true}
 
+// The two values the product collects (the quiz and Travel profile offer
+// exactly these); unset is the third state and needs no vocabulary entry.
+var allowedGenders = map[string]bool{"male": true, "female": true}
+
 type PreferencesResponse struct {
 	Budget           *string  `json:"budget"`
 	Pace             *string  `json:"pace"`
@@ -38,6 +42,7 @@ type PreferencesResponse struct {
 	OutdoorIntensity *string  `json:"outdoor_intensity"`
 	Companions       *string  `json:"companions"`
 	Baggage          *string  `json:"baggage"`
+	Gender           *string  `json:"gender"`
 }
 
 type PutPreferencesRequest struct {
@@ -53,6 +58,9 @@ type PutPreferencesRequest struct {
 	OutdoorIntensity *string `json:"outdoor_intensity"`
 	Companions       *string `json:"companions"`
 	Baggage          *string `json:"baggage"`
+	// Pointer distinguishes omitted (nil -> keep) from cleared ("" -> clear):
+	// gender is removable, unlike the other enum fields (see 00076).
+	Gender *string `json:"gender"`
 }
 
 func toPreferencesResponse(p store.TravelerPreference) PreferencesResponse {
@@ -71,6 +79,7 @@ func toPreferencesResponse(p store.TravelerPreference) PreferencesResponse {
 		OutdoorIntensity: p.OutdoorIntensity,
 		Companions:       p.Companions,
 		Baggage:          p.Baggage,
+		Gender:           p.Gender,
 	}
 }
 
@@ -150,6 +159,16 @@ func putPreferencesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// "" is an explicit clear for gender (normalizeChoice reads "" as
+	// "omitted", so the flag is decided before it): the one enum field a
+	// traveler must be able to remove, not just change.
+	clearGender := req.Gender != nil && strings.TrimSpace(*req.Gender) == ""
+	gender, err := normalizeChoice(req.Gender, allowedGenders, "gender")
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	// nil interests -> leave unchanged; provided (incl. empty) -> set/clear.
 	var interestsArg interface{}
 	if req.Interests != nil {
@@ -169,6 +188,8 @@ func putPreferencesHandler(w http.ResponseWriter, r *http.Request) {
 		OutdoorIntensity: outdoorIntensity,
 		Companions:       companions,
 		Baggage:          baggage,
+		Gender:           gender,
+		ClearGender:      clearGender,
 	})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "could not save preferences")

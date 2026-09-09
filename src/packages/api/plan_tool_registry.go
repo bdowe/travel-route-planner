@@ -353,7 +353,7 @@ var createItineraryTool = anthropic.ToolParam{
 
 var savePrefsTool = anthropic.ToolParam{
 	Name:        "save_preferences",
-	Description: anthropic.String("Save what you learn about the traveler so future trips are personalized. Call this when the user reveals a budget level, trip pace, interests, which airport they fly from, whether they work while traveling, whether they keep a fitness routine on the road, how demanding they like their outdoor days, who they travel with, what luggage they fly with, or any other durable fact about how they travel. Only include fields you actually learned."),
+	Description: anthropic.String("Save what you learn about the traveler so future trips are personalized. Call this when the user reveals a budget level, trip pace, interests, which airport they fly from, whether they work while traveling, whether they keep a fitness routine on the road, how demanding they like their outdoor days, who they travel with, what luggage they fly with, their gender when they state it themselves, or any other durable fact about how they travel. Only include fields you actually learned."),
 	InputSchema: anthropic.ToolInputSchemaParam{
 		Properties: map[string]any{
 			"budget": map[string]any{
@@ -374,6 +374,11 @@ var savePrefsTool = anthropic.ToolParam{
 			"home_airport": map[string]any{
 				"type":        "string",
 				"description": "The traveler's home/departure airport as an IATA code, e.g. BOS — save it when they mention where they usually fly from",
+			},
+			"gender": map[string]any{
+				"type":        "string",
+				"enum":        []string{"male", "female"},
+				"description": "The traveler's gender, ONLY when they state it about themselves ('as a woman traveling solo…') — never inferred from name, voice, or anything else. Informs what-to-wear and safety-relevant advice.",
 			},
 			"profile_notes": map[string]any{
 				"type":        "string",
@@ -938,6 +943,7 @@ func runSavePreferencesTool(s *planSession, input json.RawMessage) (string, bool
 		OutdoorIntensity *string  `json:"outdoor_intensity"`
 		Companions       *string  `json:"companions"`
 		Baggage          *string  `json:"baggage"`
+		Gender           *string  `json:"gender"`
 	}
 	json.Unmarshal(input, &in)
 
@@ -962,6 +968,9 @@ func runSavePreferencesTool(s *planSession, input json.RawMessage) (string, bool
 	outdoorIntensity := keep(normalizeChoice(in.OutdoorIntensity, allowedOutdoorIntensities, "outdoor_intensity"))
 	companions := keep(normalizeChoice(in.Companions, allowedCompanions, "companions"))
 	baggage := keep(normalizeChoice(in.Baggage, allowedBaggageTiers, "baggage"))
+	// Set-only here, like every agent write: "" reads as nothing-to-say, and
+	// only the traveler (PUT) can clear a stored gender.
+	gender := keep(normalizeChoice(in.Gender, allowedGenders, "gender"))
 
 	// The clear flag is deliberately dropped: like profile_notes below, only the
 	// user (PUT) can empty a home airport — an agent sending "" means it had
@@ -982,7 +991,7 @@ func runSavePreferencesTool(s *planSession, input json.RawMessage) (string, bool
 	}
 	_, err := store.New(dbPool).UpsertPreferences(s.ctx, store.UpsertPreferencesParams{
 		UserID: s.uid, Budget: budget, Pace: pace, Interests: interestsArg, HomeAirport: homeAirport, ProfileNotes: notes, WorkStyle: workStyle,
-		FitnessRoutine: fitnessRoutine, OutdoorIntensity: outdoorIntensity, Companions: companions, Baggage: baggage,
+		FitnessRoutine: fitnessRoutine, OutdoorIntensity: outdoorIntensity, Companions: companions, Baggage: baggage, Gender: gender,
 	})
 	if err != nil {
 		return fmt.Sprintf("Could not save preferences: %v", err), true

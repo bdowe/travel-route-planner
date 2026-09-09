@@ -2,7 +2,7 @@
 SELECT * FROM traveler_preferences WHERE user_id = $1;
 
 -- name: UpsertPreferences :one
-INSERT INTO traveler_preferences (user_id, budget, pace, interests, home_airport, profile_notes, work_style, fitness_routine, outdoor_intensity, companions, baggage)
+INSERT INTO traveler_preferences (user_id, budget, pace, interests, home_airport, profile_notes, work_style, fitness_routine, outdoor_intensity, companions, baggage, gender)
 VALUES (
     sqlc.arg('user_id'),
     sqlc.narg('budget'),
@@ -14,7 +14,8 @@ VALUES (
     sqlc.narg('fitness_routine'),
     sqlc.narg('outdoor_intensity'),
     sqlc.narg('companions'),
-    sqlc.narg('baggage')
+    sqlc.narg('baggage'),
+    sqlc.narg('gender')
 )
 ON CONFLICT (user_id) DO UPDATE SET
     budget            = COALESCE(sqlc.narg('budget'), traveler_preferences.budget),
@@ -33,5 +34,12 @@ ON CONFLICT (user_id) DO UPDATE SET
     fitness_routine   = COALESCE(sqlc.narg('fitness_routine'), traveler_preferences.fitness_routine),
     outdoor_intensity = COALESCE(sqlc.narg('outdoor_intensity'), traveler_preferences.outdoor_intensity),
     companions        = COALESCE(sqlc.narg('companions'), traveler_preferences.companions),
-    baggage           = COALESCE(sqlc.narg('baggage'), traveler_preferences.baggage)
+    baggage           = COALESCE(sqlc.narg('baggage'), traveler_preferences.baggage),
+    -- Clearable like home_airport (and unlike the other enum fields): a
+    -- stored gender the traveler cannot remove is not acceptable, so ""
+    -- on the PUT becomes a real NULL here.
+    gender            = CASE
+        WHEN sqlc.arg('clear_gender')::boolean THEN NULL
+        ELSE COALESCE(sqlc.narg('gender'), traveler_preferences.gender)
+    END
 RETURNING *;

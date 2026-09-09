@@ -494,6 +494,30 @@ abstract class AppLocalizations {
   /// **'Flight prices are quoted with this bag included, so the cheapest option really is the cheapest.'**
   String get prefsBaggageHelp;
 
+  /// No description provided for @prefsGender.
+  ///
+  /// In en, this message translates to:
+  /// **'Gender'**
+  String get prefsGender;
+
+  /// No description provided for @prefsGenderHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — used only for advice that depends on it, like what to pack or safety tips. Tap your selection again to remove it.'**
+  String get prefsGenderHelp;
+
+  /// No description provided for @prefsGenderMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get prefsGenderMale;
+
+  /// No description provided for @prefsGenderFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get prefsGenderFemale;
+
   /// Trip pace option shown on a chip; the stored API value stays 'relaxed'.
   ///
   /// In en, this message translates to:
@@ -1561,6 +1585,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'So the fares you\'re shown already include your bag fees.'**
   String get quizBaggageSubtitle;
+
+  /// No description provided for @quizGenderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your gender?'**
+  String get quizGenderTitle;
+
+  /// No description provided for @quizGenderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — it helps with packing suggestions and safety tips. Skip it if you\'d rather not say.'**
+  String get quizGenderSubtitle;
 
   /// No description provided for @quizTripsTitle.
   ///

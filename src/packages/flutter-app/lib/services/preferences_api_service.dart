@@ -26,6 +26,7 @@ class PreferencesApiService {
     String? outdoorIntensity,
     String? companions,
     String? baggage,
+    String? gender,
   }) async {
     final res = await apiClient.httpClient.put(
       Uri.parse('${apiClient.baseUrl}/preferences'),
@@ -41,6 +42,8 @@ class PreferencesApiService {
         'outdoor_intensity': outdoorIntensity,
         'companions': companions,
         'baggage': baggage,
+        // null keeps the stored value; '' clears it (00076's clear flag).
+        'gender': gender,
       }),
     );
     if (res.statusCode == 200) {

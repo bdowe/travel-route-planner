@@ -36,12 +36,23 @@ const companionOptions = [
 /// (specs/traveler-baggage). Values match the API's baggage enum exactly.
 const baggageOptions = ['personal_item', 'carry_on', 'checked'];
 
+/// Optional, and clearable once set (tap the selected chip again). Values
+/// are API vocabulary like every list here; "not stated" is null, never a
+/// third string.
+const genderOptions = ['male', 'female'];
+
 String fitnessRoutineLabel(AppLocalizations l10n, String value) =>
     switch (value) {
       'gym' => l10n.prefsFitnessGym,
       'running' => l10n.prefsFitnessRunning,
       'both' => l10n.prefsFitnessBoth,
       'none' => l10n.prefsFitnessNone,
+      _ => value,
+    };
+
+String genderLabel(AppLocalizations l10n, String value) => switch (value) {
+      'male' => l10n.prefsGenderMale,
+      'female' => l10n.prefsGenderFemale,
       _ => value,
     };
 

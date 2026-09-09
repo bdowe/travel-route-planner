@@ -43,6 +43,7 @@ class _FakePrefsApi implements PreferencesApiService {
     String? outdoorIntensity,
     String? companions,
     String? baggage,
+    String? gender,
   }) async {
     saveCalls++;
     savedBaggage = baggage;
@@ -166,13 +167,13 @@ void main() {
       await tester.pump();
 
       // style -> work -> interests -> active -> companions -> home airport ->
-      // bags (step 7 of 8).
-      for (var i = 0; i < 6; i++) {
+      // bags (step 8 of 9, one further since the gender step landed at 6).
+      for (var i = 0; i < 7; i++) {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
       }
       expect(find.text('What do you fly with?'), findsOneWidget);
-      expect(find.text('Step 7 of 8'), findsOneWidget);
+      expect(find.text('Step 8 of 9'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(ChoiceChip, 'Checked bag'));
       await tester.pump();
@@ -198,7 +199,7 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      for (var i = 0; i < 6; i++) {
+      for (var i = 0; i < 7; i++) {
         await tester.tap(find.text('Next'));
         await tester.pumpAndSettle();
       }
