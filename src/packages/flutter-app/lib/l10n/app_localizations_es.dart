@@ -812,7 +812,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get quizGenderSubtitle =>
-      'Opcional: ayuda con sugerencias de equipaje y consejos de seguridad. Sáltalo si prefieres no decirlo.';
+      'Opcional: se usa para adaptar las sugerencias de equipaje y los consejos de seguridad.';
 
   @override
   String get quizTripsTitle => '¿Sueñas con algún viaje?';

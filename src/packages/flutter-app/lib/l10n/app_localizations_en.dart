@@ -803,7 +803,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quizGenderSubtitle =>
-      'Optional — it helps with packing suggestions and safety tips. Skip it if you\'d rather not say.';
+      'Optional — used to tailor packing suggestions and safety tips.';
 
   @override
   String get quizTripsTitle => 'Any trips you\'re dreaming about?';
