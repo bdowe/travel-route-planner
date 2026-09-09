@@ -249,7 +249,7 @@
   "quizBaggageTitle": "¿Con qué equipaje vuelas?",
   "quizBaggageSubtitle": "Así las tarifas que te mostremos ya incluirán el coste de tu equipaje.",
   "quizGenderTitle": "¿Cuál es tu género?",
-  "quizGenderSubtitle": "Opcional: ayuda con sugerencias de equipaje y consejos de seguridad. Sáltalo si prefieres no decirlo.",
+  "quizGenderSubtitle": "Opcional: se usa para adaptar las sugerencias de equipaje y los consejos de seguridad.",
   "quizTripsTitle": "¿Sueñas con algún viaje?",
   "quizTripsSubtitle": "Lugares, épocas del año, ocasiones: el planificador los tendrá en cuenta.",
   "quizTripsHint": "p. ej. Japón en temporada de cerezos en flor, saltar de isla en isla por Grecia el próximo verano…",

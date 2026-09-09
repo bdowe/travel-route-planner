@@ -330,7 +330,7 @@
   "quizBaggageTitle": "What do you fly with?",
   "quizBaggageSubtitle": "So the fares you're shown already include your bag fees.",
   "quizGenderTitle": "What's your gender?",
-  "quizGenderSubtitle": "Optional — it helps with packing suggestions and safety tips. Skip it if you'd rather not say.",
+  "quizGenderSubtitle": "Optional — used to tailor packing suggestions and safety tips.",
   "quizTripsTitle": "Any trips you're dreaming about?",
   "quizTripsSubtitle": "Places, seasons, occasions — the planner will keep them in mind.",
   "quizTripsHint": "e.g. Japan for cherry blossom season, a Greek island hop next summer…",

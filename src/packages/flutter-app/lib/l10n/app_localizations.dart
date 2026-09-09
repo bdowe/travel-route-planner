@@ -1595,7 +1595,7 @@ abstract class AppLocalizations {
   /// No description provided for @quizGenderSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Optional — it helps with packing suggestions and safety tips. Skip it if you\'d rather not say.'**
+  /// **'Optional — used to tailor packing suggestions and safety tips.'**
   String get quizGenderSubtitle;
 
   /// No description provided for @quizTripsTitle.
