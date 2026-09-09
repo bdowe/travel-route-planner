@@ -938,6 +938,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bookingRowAddDetails => 'Add details…';
 
   @override
+  String get bookingRowNotNeeded => 'Remove — no booking needed';
+
+  @override
+  String get bookingRowRestore => 'Restore to checklist';
+
+  @override
+  String get bookingRowRemovedTag => 'Removed — no booking needed';
+
+  @override
+  String get bookingDismissBody =>
+      'It comes off your list and out of the counts, and reminders skip it. It stays in step with your trip — restore it any time from the All view.';
+
+  @override
   String get bookingRowMoveTo => 'Move to…';
 
   @override

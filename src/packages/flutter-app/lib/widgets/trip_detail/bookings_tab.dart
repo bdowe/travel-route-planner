@@ -272,6 +272,64 @@ extension on _TripDetailScreenState {
   }
 
 
+  /// "Remove — no booking needed" (00077): confirms, then dismisses the
+  /// derived slot. Reversible, so the dialog carries the how-back rather
+  /// than #560's stakes ladder — nothing cascades and nothing is deleted.
+  Future<void> _dismissTodo(BookingTodo todo) async {
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(l10n.bookingRemoveTitle(todo.title)),
+            content: Text(l10n.bookingDismissBody),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(l10n.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(l10n.bookingCardRemove),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    await _setRowDismissed(todo, true);
+  }
+
+  Future<void> _restoreTodo(BookingTodo todo) => _setRowDismissed(todo, false);
+
+  /// Optimistic like [_setRowBooked]'s todo branch: flip locally, PATCH, roll
+  /// back on failure.
+  Future<void> _setRowDismissed(BookingTodo todo, bool dismissed) async {
+    if (_guardOffline()) return;
+    final l10n = context.l10n;
+    final prevTodos = _bookingTodos;
+    _rebuild(() {
+      _bookingTodos = [
+        for (final t in _bookingTodos)
+          if (t.id == todo.id) t.copyWith(dismissed: dismissed) else t,
+      ];
+    });
+    try {
+      await ref
+          .read(bookingTodosApiServiceProvider)
+          .setDismissed(widget.tripId, todo.id, dismissed);
+    } catch (e) {
+      if (mounted) {
+        _rebuild(() => _bookingTodos = prevTodos);
+      }
+      _showSnack(l10n.tripUpdateFailed(friendlyError(l10n, e)));
+      return;
+    }
+    // Dismissal moves the same arithmetic the booked flip moves — counts,
+    // Next Step, review — so it invalidates on the same only-after-accept
+    // contract.
+    if (mounted) _invalidateReview();
+  }
+
   /// "Add details…" on an inline booking row: promotes the todo to a
   /// confirmed accommodation/segment via the existing add-sheets, prefilled
   /// from the todo. Confirmed records are what viewers see and what calendar
@@ -773,7 +831,11 @@ extension on _TripDetailScreenState {
     final l10n = context.l10n;
     var entries = bookingSlotEntries(slot, part: part);
     if (unbookedOnly) {
-      entries = entries.where((e) => !bookingEntryBooked(e)).toList();
+      // Dismissed slots are not to-book work (00077): they live only under
+      // "All", greyed, where Restore is.
+      entries = entries
+          .where((e) => !bookingEntryBooked(e) && !bookingEntryDismissed(e))
+          .toList();
     }
     // A claimed reservation is still the traveler's own row — the one kind
     // that can be renamed, re-filed or removed — so it keeps the affordances
@@ -790,6 +852,20 @@ extension on _TripDetailScreenState {
             compact: _narrow,
             onBookedChanged: (v) => _setRowBooked(v,
                 todo: todo, stay: e.stay, segment: e.segment),
+            dismissed: todo.dismissed,
+            // Only a bare derived slot is dismissible: a confirmed stay or
+            // segment in the slot is a real record, and manual rows delete.
+            onDismiss: (!_readOnly &&
+                    !_isOffline &&
+                    todo.auto &&
+                    !todo.dismissed &&
+                    e.stay == null &&
+                    e.segment == null)
+                ? () => _dismissTodo(todo)
+                : null,
+            onRestore: (!_readOnly && !_isOffline && todo.dismissed)
+                ? () => _restoreTodo(todo)
+                : null,
             onOpen: _openCallbackFor(todo),
             openLabelOverride: _ferryLegs.containsKey(todo.todoKey)
                 ? (_narrow ? l10n.tripFindFerriesShort : l10n.tripFindFerries)
@@ -810,6 +886,7 @@ extension on _TripDetailScreenState {
             // duplicate of it — the two guards cover different halves.)
             onAddDetails: (_readOnly ||
                     _isOffline ||
+                    todo.dismissed ||
                     todo.kind == 'other' ||
                     e.segment != null)
                 ? null
@@ -818,13 +895,15 @@ extension on _TripDetailScreenState {
             // own airports title, so they are the only ones this moves. The
             // role comes from the server, which stores it as identity —
             // guessing it here would be wrong on a row it demoted.
-            onChangeAirport: (_readOnly || _isOffline || !todo.isHomeLeg)
+            onChangeAirport:
+                (_readOnly || _isOffline || todo.dismissed || !todo.isHomeLeg)
                 ? null
                 : () => _openTripAirports(),
             // No picker when a confirmed segment fills the slot — that row's
             // mode truth is the segment, edited via its own sheet.
             onModeChanged: (_readOnly ||
                     _isOffline ||
+                    todo.dismissed ||
                     e.segment != null ||
                     todo.kind != 'transport')
                 ? null

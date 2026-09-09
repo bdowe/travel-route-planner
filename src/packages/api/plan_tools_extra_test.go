@@ -343,14 +343,17 @@ func TestBookingTodoToolsRefuseAutoRows(t *testing.T) {
 		json.RawMessage(`{"trip_id":"`+trip.ID.String()+`","todo_id":"`+autoID.String()+`","title":"Overwrite"}`)); !isErr || !strings.Contains(msg, "auto") {
 		t.Fatalf("auto row updated: %q (err=%v)", msg, isErr)
 	}
+	// remove on an auto row is no longer a refusal: it DISMISSES (00077) —
+	// the row survives, hidden and restorable, and the result says so.
 	if msg, isErr := runRemoveBookingTodoTool(s,
-		json.RawMessage(`{"trip_id":"`+trip.ID.String()+`","todo_id":"`+autoID.String()+`"}`)); !isErr || !strings.Contains(msg, "auto") {
-		t.Fatalf("auto row removed: %q (err=%v)", msg, isErr)
+		json.RawMessage(`{"trip_id":"`+trip.ID.String()+`","todo_id":"`+autoID.String()+`"}`)); isErr || !strings.Contains(msg, "no booking") {
+		t.Fatalf("auto row dismissal = %q (err=%v)", msg, isErr)
 	}
 	var n int
+	var dismissed bool
 	if err := dbPool.QueryRow(context.Background(),
-		`SELECT count(*) FROM booking_todos WHERE id = $1`, autoID).Scan(&n); err != nil || n != 1 {
-		t.Fatalf("auto row gone (n=%d, err=%v)", n, err)
+		`SELECT count(*), bool_or(dismissed) FROM booking_todos WHERE id = $1`, autoID).Scan(&n, &dismissed); err != nil || n != 1 || !dismissed {
+		t.Fatalf("auto row after tool remove: n=%d dismissed=%v err=%v — must survive as dismissed", n, dismissed, err)
 	}
 }
 

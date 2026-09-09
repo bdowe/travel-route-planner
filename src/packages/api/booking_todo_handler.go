@@ -75,6 +75,7 @@ type BookingTodoResponse struct {
 	Booked    bool    `json:"booked"`
 	Auto      bool    `json:"auto"`
 	Position  int     `json:"position"`
+	Dismissed bool    `json:"dismissed"`
 }
 
 func toBookingTodoResponse(t store.BookingTodo) BookingTodoResponse {
@@ -95,6 +96,7 @@ func toBookingTodoResponse(t store.BookingTodo) BookingTodoResponse {
 		Role:        strPtrOrNil(strPtrVal(t.Role)),
 		CityLabel:   t.CityLabel,
 		Booked:      t.Booked,
+		Dismissed:   t.Dismissed,
 		Auto:        t.Auto,
 		Position:    int(t.Position),
 	}
@@ -610,9 +612,13 @@ func addBookingTodoHandler(w http.ResponseWriter, r *http.Request) {
 // COALESCE cannot carry (the 00071 lesson), which is why it does not ride
 // UpdateBookingTodo.
 type PatchBookingTodoRequest struct {
-	Mode        *string `json:"mode"`
-	CityLabel   *string `json:"city_label"`
-	Booked      *bool   `json:"booked"`
+	Mode      *string `json:"mode"`
+	CityLabel *string `json:"city_label"`
+	Booked    *bool   `json:"booked"`
+	// The dismissal lane (00077): auto rows only, exclusive like mode and
+	// city_label. true hides a derived slot the trip doesn't need without
+	// fighting the sync; false restores it.
+	Dismissed   *bool   `json:"dismissed"`
 	Kind        *string `json:"kind"`
 	Title       *string `json:"title"`
 	Subtitle    *string `json:"subtitle"`
@@ -678,6 +684,20 @@ func patchBookingTodoHandler(w http.ResponseWriter, r *http.Request) {
 			Mode:      &mode,
 			Provider:  strPtrOrNil(provider),
 			SearchUrl: strPtrOrNil(url),
+		})
+	} else if req.Dismissed != nil {
+		// Exclusive like the mode and city_label lanes; auto-only is enforced
+		// in the query's WHERE, so a manual or foreign id falls through to
+		// the shared 404 — a manual row the traveler doesn't need is deleted,
+		// not dismissed.
+		if req.hasContentEdit() || req.Booked != nil || req.CityLabel != nil {
+			writeJSONError(w, http.StatusBadRequest, "dismissed cannot be combined with other fields")
+			return
+		}
+		todo, err = store.New(dbPool).SetBookingTodoDismissed(r.Context(), store.SetBookingTodoDismissedParams{
+			ID:        todoID,
+			TripID:    tripID,
+			Dismissed: *req.Dismissed,
 		})
 	} else if req.CityLabel != nil {
 		// The "Move to…" lane (00074): where the row FILES, orthogonal to its

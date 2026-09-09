@@ -132,7 +132,7 @@ var updateBookingTodoTool = anthropic.ToolParam{
 
 var removeBookingTodoTool = anthropic.ToolParam{
 	Name:        "remove_booking_todo",
-	Description: anthropic.String("Remove an item from a saved trip's booking checklist when it no longer applies. A changed destination or plan does NOT by itself make the booking moot — the traveler may hold a real reservation for the old leg, and removing the checklist row cancels nothing with the provider. An item marked booked, carrying saved booking options, or linked to a budget expense is REFUSED without the traveler's explicit confirmation: relay the refusal's stakes, and only if the traveler confirms call again with confirm: true. Items marked 'auto' in get_trip cannot be removed — they track the itinerary automatically. Call get_trip first to get the item's todo_id."),
+	Description: anthropic.String("Remove an item from a saved trip's booking checklist when it no longer applies. A changed destination or plan does NOT by itself make the booking moot — the traveler may hold a real reservation for the old leg, and removing the checklist row cancels nothing with the provider. An item marked booked, carrying saved booking options, or linked to a budget expense is REFUSED without the traveler's explicit confirmation: relay the refusal's stakes, and only if the traveler confirms call again with confirm: true. On an item marked 'auto' in get_trip (one that tracks the itinerary), this marks the slot as needing no booking instead of deleting it — the right call when the traveler is staying with friends or family, or otherwise doesn't need to book that leg; it disappears from their to-book list and reminders, stays restorable, and the checklist will show it as removed by the traveler. Call get_trip first to get the item's todo_id."),
 	InputSchema: anthropic.ToolInputSchemaParam{
 		Properties: map[string]any{
 			"trip_id": map[string]any{
@@ -884,10 +884,15 @@ func runGetTripTool(ctx context.Context, authed bool, uid uuid.UUID, boundTripID
 			if td.Booked {
 				status = "booked"
 			}
+			if td.Dismissed {
+				// The traveler marked the slot not-needed: say so, so the
+				// model neither nags about booking it nor re-adds a twin.
+				status = "removed by traveler — no booking needed; do not re-add or suggest booking it"
+			}
 			origin := "added by traveler"
 			switch {
 			case td.Auto:
-				origin = "auto — tracks the itinerary; not editable directly (change what it tracks: set_trip_origin / set_leg_dates / set_travel_mode), never duplicate it"
+				origin = "auto — tracks the itinerary; not editable directly (change what it tracks: set_trip_origin / set_leg_dates / set_travel_mode), never duplicate it; if the traveler needs no booking for it (staying with family, driving themselves), remove_booking_todo marks it not-needed"
 			case strings.HasPrefix(td.TodoKey, "agent:"):
 				origin = "agent-added"
 			}
@@ -1126,6 +1131,20 @@ func runRemoveBookingTodoTool(s *planSession, input json.RawMessage) (string, bo
 	// a wrong id and an auto row stay indistinguishable, exactly as today.
 	st, err := store.New(dbPool).GetBookingTodoDeleteState(s.ctx, store.GetBookingTodoDeleteStateParams{ID: todoID, TripID: tid})
 	if err != nil {
+		// Not a manual row. If it is an AUTO row, deletion would not stick —
+		// the next sync re-derives it — so the honest removal is a dismissal
+		// (00077): the row stays synced but hidden, counts and nudges skip
+		// it, and the traveler can restore it from the checklist. The
+		// dismissal query is auto-scoped, so a genuinely missing id still
+		// lands on the missing message below.
+		if dismissedRow, derr := store.New(dbPool).SetBookingTodoDismissed(s.ctx, store.SetBookingTodoDismissedParams{
+			ID: todoID, TripID: tid, Dismissed: true,
+		}); derr == nil {
+			touchTripAs(s.ctx, tid, s.uid)
+			sendSSE(s.w, "trip_updated", map[string]string{"trip_id": tid.String()})
+			safeGo("recordEvent", func() { recordEvent(s.uid, "agent_booking_todo_dismissed", &tid, nil) })
+			return fmt.Sprintf("%q is a derived row that tracks the itinerary, so it can't be deleted outright — it is now marked as needing no booking: hidden from the to-book list, skipped by counts and reminders, and the checklist will say so. The traveler can restore it from the checklist's All view if plans change.", dismissedRow.Title), false
+		}
 		return bookingTodoMissingMsg, true
 	}
 	if !in.Confirm {

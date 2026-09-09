@@ -1802,6 +1802,30 @@ abstract class AppLocalizations {
   /// **'Add details…'**
   String get bookingRowAddDetails;
 
+  /// No description provided for @bookingRowNotNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove — no booking needed'**
+  String get bookingRowNotNeeded;
+
+  /// No description provided for @bookingRowRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore to checklist'**
+  String get bookingRowRestore;
+
+  /// No description provided for @bookingRowRemovedTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Removed — no booking needed'**
+  String get bookingRowRemovedTag;
+
+  /// No description provided for @bookingDismissBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It comes off your list and out of the counts, and reminders skip it. It stays in step with your trip — restore it any time from the All view.'**
+  String get bookingDismissBody;
+
   /// No description provided for @bookingRowMoveTo.
   ///
   /// In en, this message translates to:

@@ -21,6 +21,7 @@ BookingTodo _$BookingTodoFromJson(Map<String, dynamic> json) => BookingTodo(
       role: json['role'] as String?,
       cityLabel: json['city_label'] as String?,
       booked: json['booked'] as bool? ?? false,
+      dismissed: json['dismissed'] as bool? ?? false,
       auto: json['auto'] as bool? ?? true,
       position: (json['position'] as num?)?.toInt() ?? 0,
     );
@@ -42,5 +43,6 @@ Map<String, dynamic> _$BookingTodoToJson(BookingTodo instance) =>
       'city_label': instance.cityLabel,
       'booked': instance.booked,
       'auto': instance.auto,
+      'dismissed': instance.dismissed,
       'position': instance.position,
     };

@@ -52,6 +52,21 @@ class BookingTodosApiService {
     throw Exception('Failed to update booking todo (${res.statusCode})');
   }
 
+  /// The dismissal lane (00077): flips a derived slot's not-needed flag.
+  /// Auto rows only server-side; restore is the same call with false.
+  Future<BookingTodo> setDismissed(
+      String tripId, String todoId, bool dismissed) async {
+    final res = await apiClient.httpClient.patch(
+      Uri.parse('${apiClient.baseUrl}/trips/$tripId/booking-todos/$todoId'),
+      headers: apiClient.jsonHeaders(json: true),
+      body: jsonEncode({'dismissed': dismissed}),
+    );
+    if (res.statusCode == 200) {
+      return BookingTodo.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to update booking todo (${res.statusCode})');
+  }
+
   /// Sets the per-leg transport-mode override on a transport todo (auto rows
   /// included). Origin/destination/depart_date/passengers are never persisted —
   /// the server uses them to rebuild the row's provider + search link for the

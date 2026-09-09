@@ -113,6 +113,10 @@ class _BookingRowTrailing extends StatelessWidget {
   final bool checkboxValue;
   final ValueChanged<bool> onCheckboxChanged;
 
+  /// false swaps the checkbox for an equal-width spacer (dismissed rows have
+  /// no booked state to record) so the flush-right column survives.
+  final bool showCheckbox;
+
   /// Rendered after the checkbox (the reorder handle on residual cards).
   final Widget? trailingExtra;
 
@@ -125,6 +129,7 @@ class _BookingRowTrailing extends StatelessWidget {
     required this.compact,
     required this.checkboxValue,
     required this.onCheckboxChanged,
+    this.showCheckbox = true,
     this.trailingExtra,
   });
 
@@ -174,12 +179,15 @@ class _BookingRowTrailing extends StatelessWidget {
         const SizedBox(width: AppSpacing.xs),
         // Last so the fixed-width checkboxes stay flush right and aligned
         // across rows despite varying button-label widths.
-        Checkbox(
-          value: checkboxValue,
-          onChanged: (v) => onCheckboxChanged(v ?? false),
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
+        if (showCheckbox)
+          Checkbox(
+            value: checkboxValue,
+            onChanged: (v) => onCheckboxChanged(v ?? false),
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          )
+        else
+          const SizedBox(width: 40),
         if (trailingExtra != null) trailingExtra!,
       ],
     );
@@ -325,6 +333,18 @@ class BookingTodoRow extends StatelessWidget {
   /// Same override as [BookingTodoCard.openLabelOverride].
   final String? openLabelOverride;
 
+  /// The traveler marked this derived slot as needing no booking (00077):
+  /// the row renders muted with a removed tag, hides its checkbox, and its
+  /// menu offers only Restore.
+  final bool dismissed;
+
+  /// "Remove — no booking needed": dismisses a derived slot (auto rows only;
+  /// the tab gates it and confirms first). Null hides the entry.
+  final VoidCallback? onDismiss;
+
+  /// Restores a dismissed slot. Null hides the entry.
+  final VoidCallback? onRestore;
+
   /// "Add details…": promotes this todo to a confirmed accommodation/segment
   /// via a prefilled add-sheet. Confirmed records are what viewers see and
   /// what calendar export / Tonight / map stay pins read, so this is the
@@ -375,6 +395,9 @@ class BookingTodoRow extends StatelessWidget {
     required this.onBookedChanged,
     this.onOpen,
     this.openLabelOverride,
+    this.dismissed = false,
+    this.onDismiss,
+    this.onRestore,
     this.onAddDetails,
     this.onChangeAirport,
     this.compact = false,
@@ -419,10 +442,19 @@ class BookingTodoRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: todo.booked ? muted : null,
+                    // Dismissed mutes without the strikethrough: struck-out
+                    // means done, and this row is opted out, not done.
+                    color: (todo.booked || dismissed) ? muted : null,
                     decoration: todo.booked ? TextDecoration.lineThrough : null,
                   ),
                 ),
+                if (dismissed)
+                  Text(
+                    context.l10n.bookingRowRemovedTag,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                  ),
                 if (todo.subtitle != null && todo.subtitle!.isNotEmpty)
                   Text(
                     todo.subtitle!,
@@ -439,6 +471,9 @@ class BookingTodoRow extends StatelessWidget {
                 compact: compact),
             onAction: onOpen,
             menuItems: [
+              // A dismissed row's one affordance: the way back.
+              if (onRestore != null)
+                (value: 'restore', label: context.l10n.bookingRowRestore),
               // First: on a home leg it is the more consequential of the two,
               // and it is what a traveler reaching for "Add details…" to
               // retype an airport was actually looking for.
@@ -457,16 +492,24 @@ class BookingTodoRow extends StatelessWidget {
                 (value: 'edit', label: context.l10n.bookingCardEdit),
               if (onDelete != null)
                 (value: 'delete', label: context.l10n.bookingCardRemove),
+              // Last: the opt-out is the rarest act on a live row.
+              if (onDismiss != null)
+                (value: 'dismiss', label: context.l10n.bookingRowNotNeeded),
             ],
             onMenuSelected: (v) => switch (v) {
+              'restore' => onRestore?.call(),
               'airport' => onChangeAirport?.call(),
               'move' => onMoveTo?.call(),
               'edit' => onEdit?.call(),
               'delete' => onDelete?.call(),
+              'dismiss' => onDismiss?.call(),
               _ => onAddDetails?.call(),
             },
             booked: todo.booked,
             compact: compact,
+            // A dismissed slot has no booked state to record: the checkbox
+            // yields its slot to a spacer so columns stay aligned.
+            showCheckbox: !dismissed,
             checkboxValue: todo.booked,
             onCheckboxChanged: onBookedChanged,
           ),
