@@ -11,8 +11,11 @@ SELECT * FROM booking_todos WHERE trip_id = $1 ORDER BY position ASC, created_at
 -- ride the DO UPDATE set so a re-sync refreshes them. So does derived_mode
 -- (00068) — what the server worked out for the leg, refreshed alongside the
 -- provider and search_url it decides. What must never join the set is
--- booked/auto/mode — that exclusion is the whole preservation contract, and
--- it is what lets a changed departure airport rewrite a home leg in place.
+-- booked/auto/mode/dismissed — that exclusion is the whole preservation
+-- contract, and it is what lets a changed departure airport rewrite a home
+-- leg in place. dismissed (00077) is preserved by OMISSION on both sides:
+-- not in the INSERT list (new rows take the DEFAULT false) and not in
+-- DO UPDATE (a re-sync never resurrects a dismissed row's visibility).
 INSERT INTO booking_todos (trip_id, kind, todo_key, title, subtitle, provider, search_url, depart_date, return_date, position, auto, role, origin_label, destination_label, derived_mode)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, $11, $12, $13, $14)
 ON CONFLICT (trip_id, todo_key) DO UPDATE SET
@@ -32,10 +35,10 @@ RETURNING *;
 
 -- name: UpsertBookingTodosBatch :exec
 -- Batch twin of UpsertBookingTodo: one round trip for the whole derived set.
--- Same column list and the same ON CONFLICT update set — booked, auto, and
--- mode are deliberately absent from DO UPDATE, so a re-sync preserves the
--- booked flag and the per-leg mode override (and never flips a row's auto
--- marker). derived_mode is NOT one of them: it is the server's own answer for
+-- Same column list and the same ON CONFLICT update set — booked, auto,
+-- mode and dismissed (00077) are deliberately absent from DO UPDATE, so a
+-- re-sync preserves the booked flag, the per-leg mode override and a
+-- dismissal (and never flips a row's auto marker). derived_mode is NOT one of them: it is the server's own answer for
 -- the leg and is refreshed on every sync, exactly like provider and search_url,
 -- which the same derivation decides. Nullable date columns ride as
 -- date[] with NULL elements; the nullable text columns ride as text[] plus a
@@ -119,6 +122,17 @@ WHERE b.trip_id = sqlc.arg('trip_id') AND b.todo_key = sqlc.arg('old_key')::text
 SELECT * FROM booking_todos
 WHERE trip_id = $1 AND auto = true AND role IN ('home_outbound', 'home_return')
 ORDER BY position ASC, created_at ASC;
+
+-- name: SetBookingTodoDismissed :one
+-- The dismissal lane (00077): auto rows only — a manual row the traveler
+-- doesn't need is simply deleted, and a derived row is the one whose
+-- deletion would not stick. The WHERE doubles as the guard, so a manual or
+-- foreign id falls through to the handler's shared 404, exactly like the
+-- mode and city_label lanes.
+UPDATE booking_todos
+SET dismissed = sqlc.arg('dismissed')::boolean
+WHERE id = $1 AND trip_id = $2 AND auto = true
+RETURNING *;
 
 -- name: RelabelBookingTodo :one
 -- Repoints ONE transport row's endpoint labels. Content only: the row

@@ -169,6 +169,12 @@ List<BookingEntry> bookingSlotEntries(BookingSlot slot,
 bool bookingEntryBooked(BookingEntry e) =>
     e.todo?.booked ?? e.stay?.booked ?? e.segment?.booked ?? true;
 
+/// A slot the traveler marked as needing no booking (00077). Only a todo can
+/// carry the flag; confirmed stays/segments are real records, never
+/// dismissed. Dismissed entries leave the to-book lens AND the counts —
+/// "Bad Ischl · 1/1", not 1/2 — via the same single derivation both read.
+bool bookingEntryDismissed(BookingEntry e) => e.todo?.dismissed ?? false;
+
 /// True when the entry has anything to render at all.
 bool bookingEntryExists(BookingEntry e) =>
     e.todo != null || e.stay != null || e.segment != null;
@@ -204,6 +210,9 @@ Map<String, ({int booked, int total})> bookingDestinationCounts(
         ...bookingSlotEntries(slot, part: BookingSlotPart.departure),
     ];
     for (final e in entries.where(bookingEntryExists)) {
+      // Dismissed slots are not booking tasks: they leave the denominator,
+      // not just the unbooked side (00077).
+      if (bookingEntryDismissed(e)) continue;
       add(labels[i], bookingEntryBooked(e));
     }
   }

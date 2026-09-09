@@ -426,7 +426,9 @@ func unbookedLabels(d exportData) []string {
 		labels = append(labels, segmentRoute(s))
 	}
 	for _, t := range d.BookingTodos {
-		if t.Booked || todoClaimed(d, t) {
+		// Dismissed (00077): the traveler said this slot needs no booking, so
+		// it must never resurface as a nudge.
+		if t.Booked || t.Dismissed || todoClaimed(d, t) {
 			continue
 		}
 		labels = append(labels, t.Title)
@@ -517,6 +519,12 @@ func walkBookingSlots(d exportData) bookingWalk {
 	for i := range d.BookingTodos {
 		t := &d.BookingTodos[i]
 		if !strings.HasPrefix(t.TodoKey, "stay:") && !strings.HasPrefix(t.TodoKey, "transport:") {
+			continue
+		}
+		// A dismissed slot is not a booking task at all: it leaves the window
+		// entirely (Total included), the same arithmetic the client's city
+		// chips use.
+		if t.Dismissed {
 			continue
 		}
 		w.Total++

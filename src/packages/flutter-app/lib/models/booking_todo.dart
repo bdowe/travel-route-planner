@@ -59,6 +59,10 @@ class BookingTodo {
   final String? cityLabel;
   final bool booked;
   final bool auto;
+
+  /// A derived slot the trip doesn't need (00077): hidden from the to-book
+  /// lens and every count, kept in sync, restorable. Only auto rows carry it.
+  final bool dismissed;
   final int position;
 
   /// True when this row is one of the trip's two journey endpoints — the leg
@@ -81,11 +85,12 @@ class BookingTodo {
     this.role,
     this.cityLabel,
     this.booked = false,
+    this.dismissed = false,
     this.auto = true,
     this.position = 0,
   });
 
-  BookingTodo copyWith({bool? booked}) => BookingTodo(
+  BookingTodo copyWith({bool? booked, bool? dismissed}) => BookingTodo(
         id: id,
         kind: kind,
         todoKey: todoKey,
@@ -100,6 +105,7 @@ class BookingTodo {
         role: role,
         cityLabel: cityLabel,
         booked: booked ?? this.booked,
+        dismissed: dismissed ?? this.dismissed,
         auto: auto,
         position: position,
       );

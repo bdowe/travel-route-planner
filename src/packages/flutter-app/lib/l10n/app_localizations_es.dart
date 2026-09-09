@@ -947,6 +947,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get bookingRowAddDetails => 'Añadir detalles…';
 
   @override
+  String get bookingRowNotNeeded => 'Quitar: no hace falta reservar';
+
+  @override
+  String get bookingRowRestore => 'Devolver a la lista';
+
+  @override
+  String get bookingRowRemovedTag => 'Quitada: no hace falta reservar';
+
+  @override
+  String get bookingDismissBody =>
+      'Desaparece de tu lista y de los recuentos, y los recordatorios la omiten. Sigue sincronizada con tu viaje: restáurala cuando quieras desde la vista Todos.';
+
+  @override
   String get bookingRowMoveTo => 'Mover a…';
 
   @override
